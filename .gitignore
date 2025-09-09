@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.log
+*.sqlite3
+
+# VS Code
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Virtual environments
+env/
+venv/
+ENV/
+.venv/
+
+# Media
+*.mp4
+*.avi
+*.mov
+*.wav
+*.mp3
+
+# Assets
+assets/icons/*.png
+
+# Test outputs
+test-results/
+
+# Misc
+*.bak
+*.tmp

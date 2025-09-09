@@ -1,0 +1,7 @@
+PyQt5>=5.15
+opencv-python>=4.5
+numpy>=1.19
+# For future pose detection (optional, comment out if not used yet)
+mediapipe>=0.10
+# For video playback alternatives (optional)
+python-vlc>=3.0
