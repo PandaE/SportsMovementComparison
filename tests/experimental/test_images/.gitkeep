@@ -1,0 +1,4 @@
+# 这个文件确保空目录被git追踪
+# 请将测试图像放在这个目录中：
+# - user_setup.jpg (用户架拍关键帧)
+# - standard_setup.jpg (标准架拍关键帧)
