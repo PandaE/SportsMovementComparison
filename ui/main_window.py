@@ -15,19 +15,73 @@ from core.experimental_comparison_engine import ExperimentalComparisonEngine
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('Sports Movement Comparator')
-        self.setGeometry(100, 100, 1200, 800)  # 增加高度以容纳新控件
-        
+        self.language = 'zh'  # 默认中文
+        self.translations = {
+            'zh': {
+                'title': '运动动作对比分析',
+                'settings': '设置',
+                'analysis_group': '分析设置',
+                'experimental': '启用高级姿态分析 (实验功能)',
+                'sport_label': '运动类型:',
+                'action_label': '动作类型:',
+                'import_user': '导入用户视频',
+                'import_standard': '导入标准视频',
+                'compare': '开始分析对比',
+                'compare_advanced': '开始高级分析对比',
+                'compare_basic': '开始基础对比',
+            },
+            'en': {
+                'title': 'Sports Movement Comparator',
+                'settings': 'Settings',
+                'analysis_group': 'Analysis Settings',
+                'experimental': 'Enable Advanced Pose Analysis (Experimental)',
+                'sport_label': 'Sport:',
+                'action_label': 'Action:',
+                'import_user': 'Import User Video',
+                'import_standard': 'Import Standard Video',
+                'compare': 'Start Comparison',
+                'compare_advanced': 'Start Advanced Comparison',
+                'compare_basic': 'Start Basic Comparison',
+            }
+        }
+
         # 初始化分析引擎
         self.experimental_engine = ExperimentalComparisonEngine(use_experimental_features=True)
         self.basic_engine = ComparisonEngine()
         self.current_engine = self.experimental_engine
-        
+
         # 设置对话框
         self.settings_dialog = SettingsDialog(self)
         self.settings_dialog.settings_changed.connect(self.apply_settings)
-        
+
         self.init_ui()
+        self.update_language(self.language)
+
+    def tr_text(self, key):
+        return self.translations.get(self.language, self.translations['zh']).get(key, key)
+
+    def update_language(self, lang):
+        self.language = lang
+        self.setWindowTitle(self.tr_text('title'))
+        self.settings_btn.setText(self.tr_text('settings'))
+        self.experimental_checkbox.setText(self.tr_text('experimental'))
+        self.sport_combo.setItemText(0, '羽毛球' if lang == 'zh' else 'Badminton')
+        self.action_combo.setItemText(0, '正手高远球' if lang == 'zh' else 'Clear Shot (High Long Shot)')
+        self.import_user_btn.setText(self.tr_text('import_user'))
+        self.import_standard_btn.setText(self.tr_text('import_standard'))
+        self.compare_btn.setText(self.tr_text('compare'))
+        # 分析设置组
+        self.findChild(QGroupBox).setTitle(self.tr_text('analysis_group'))
+        # 标签
+        labels = self.findChildren(QLabel)
+        for label in labels:
+            if label.text() in ['运动类型:', 'Sport:']:
+                label.setText(self.tr_text('sport_label'))
+            elif label.text() in ['动作类型:', 'Action:']:
+                label.setText(self.tr_text('action_label'))
+        # 其他窗口语言刷新（如 results_window、advanced_analysis_window）可在此扩展
+        self.user_video_player.update_language(lang)
+        self.standard_video_player.update_language(lang)
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -191,7 +245,11 @@ class MainWindow(QWidget):
         # 更新实验模式状态
         self.experimental_checkbox.setChecked(settings.get('experimental_enabled', True))
         self.toggle_experimental_mode(2 if settings.get('experimental_enabled', True) else 0)
-        
+
+        # 语言切换
+        if 'language' in settings:
+            self.update_language(settings['language'])
+
         # 可以在这里应用其他设置到引擎
         if hasattr(self.experimental_engine, 'apply_settings'):
             self.experimental_engine.apply_settings(settings)

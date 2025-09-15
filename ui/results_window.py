@@ -12,19 +12,55 @@ from PyQt5.QtGui import QPixmap, QFont
 from ui.video_player import VideoPlayer
 
 class ResultsWindow(QWidget):
-    def __init__(self, comparison_result, user_video_path, standard_video_path):
+    def __init__(self, comparison_result, user_video_path, standard_video_path, language='zh'):
         super().__init__()
         self.comparison_result = comparison_result
         self.user_video_path = user_video_path
         self.standard_video_path = standard_video_path
-        
-        self.setWindowTitle('动作分析结果')
+        self.language = language
+        self.translations = {
+            'zh': {
+                'title': '动作分析结果',
+                'score': '综合得分',
+                'detailed_score': '详细得分',
+                'video_tab': '视频对比',
+                'analysis_tab': '动作分析',
+                'detailed_tab': '详细测量',
+                'pose_tab': '姿态可视化',
+                'user_video': '用户视频',
+                'standard_video': '标准视频',
+                'key_analysis': '关键动作分析:',
+                'detailed_measurements': '详细测量数据:',
+                'pose_visualization': '姿态对比可视化:',
+                'no_pose_image': '暂无姿态可视化图像',
+                'user_pose': '用户姿态',
+                'standard_pose': '标准姿态',
+            },
+            'en': {
+                'title': 'Analysis Results',
+                'score': 'Score',
+                'detailed_score': 'Detailed Score',
+                'video_tab': 'Video Comparison',
+                'analysis_tab': 'Action Analysis',
+                'detailed_tab': 'Detailed Measurements',
+                'pose_tab': 'Pose Visualization',
+                'user_video': 'User Video',
+                'standard_video': 'Standard Video',
+                'key_analysis': 'Key Action Analysis:',
+                'detailed_measurements': 'Detailed Measurements:',
+                'pose_visualization': 'Pose Visualization:',
+                'no_pose_image': 'No pose visualization image',
+                'user_pose': 'User Pose',
+                'standard_pose': 'Standard Pose',
+            }
+        }
+        self.setWindowTitle(self.tr_text('title'))
         self.setGeometry(150, 150, 1400, 900)
-        
-        # 检查是否是实验结果
         self.is_experimental = comparison_result.get('analysis_type') == 'experimental'
-        
         self.init_ui()
+
+    def tr_text(self, key):
+        return self.translations.get(self.language, self.translations['zh']).get(key, key)
     
     def init_ui(self):
         """初始化界面"""
@@ -50,81 +86,81 @@ class ResultsWindow(QWidget):
             }
         """)
         score_layout = QHBoxLayout()
-        
+
         # 主得分
         score = self.comparison_result.get('score', 0)
-        score_label = QLabel(f"综合得分: {score}")
+        score_label = QLabel(f"{self.tr_text('score')}: {score}")
         score_label.setStyleSheet('font-size: 28px; font-weight: bold; color: #4169e1;')
         score_layout.addWidget(score_label)
-        
+
         # 如果是实验结果，显示更详细信息
         if self.is_experimental:
             detailed_score = self.comparison_result.get('detailed_score', 0)
-            detail_label = QLabel(f"详细得分: {detailed_score:.2%}")
+            detail_label = QLabel(f"{self.tr_text('detailed_score')}: {detailed_score:.2%}")
             detail_label.setStyleSheet('font-size: 16px; color: #666;')
             score_layout.addWidget(detail_label)
-        
+
         score_frame.setLayout(score_layout)
         layout.addWidget(score_frame)
     
     def create_tab_widget(self, layout):
         """创建标签页组件"""
-        tab_widget = QTabWidget()
-        
+        self.tab_widget = QTabWidget()
+
         # 视频对比标签页
-        self.create_video_tab(tab_widget)
-        
+        self.create_video_tab(self.tab_widget)
+
         # 动作分析标签页
-        self.create_analysis_tab(tab_widget)
-        
+        self.create_analysis_tab(self.tab_widget)
+
         # 如果是实验结果，添加详细测量标签页
         if self.is_experimental:
-            self.create_detailed_measurements_tab(tab_widget)
-            self.create_pose_visualization_tab(tab_widget)
-        
-        layout.addWidget(tab_widget)
+            self.create_detailed_measurements_tab(self.tab_widget)
+            self.create_pose_visualization_tab(self.tab_widget)
+
+        layout.addWidget(self.tab_widget)
     
     def create_video_tab(self, tab_widget):
         """创建视频对比标签页"""
         video_widget = QWidget()
         video_layout = QVBoxLayout()
-        
+
         # 视频标题
         title_layout = QHBoxLayout()
-        user_title = QLabel("用户视频")
+        user_title = QLabel(self.tr_text('user_video'))
         user_title.setStyleSheet('font-size: 16px; font-weight: bold;')
         user_title.setAlignment(Qt.AlignCenter)
-        
-        standard_title = QLabel("标准视频")
+
+        standard_title = QLabel(self.tr_text('standard_video'))
         standard_title.setStyleSheet('font-size: 16px; font-weight: bold;')
         standard_title.setAlignment(Qt.AlignCenter)
-        
+
         title_layout.addWidget(user_title)
         title_layout.addWidget(standard_title)
         video_layout.addLayout(title_layout)
-        
+
         # 视频播放器
         player_layout = QHBoxLayout()
         self.user_video_player = VideoPlayer()
         self.user_video_player.set_video(self.user_video_path)
         self.standard_video_player = VideoPlayer()
         self.standard_video_player.set_video(self.standard_video_path)
-        
+
         player_layout.addWidget(self.user_video_player)
         player_layout.addWidget(self.standard_video_player)
         video_layout.addLayout(player_layout)
-        
+
         video_widget.setLayout(video_layout)
-        tab_widget.addTab(video_widget, "视频对比")
+        tab_widget.addTab(video_widget, self.tr_text('video_tab'))
     
     def create_analysis_tab(self, tab_widget):
         """创建动作分析标签页"""
         analysis_widget = QWidget()
         analysis_layout = QVBoxLayout()
-        
+
         # 关键动作分析
-        analysis_layout.addWidget(QLabel('关键动作分析:'))
-        
+        analysis_layout.addWidget(QLabel(self.tr_text('key_analysis')))
+
         self.movements_list = QListWidget()
         self.movements_list.setStyleSheet("""
             QListWidget::item {
@@ -136,13 +172,13 @@ class ResultsWindow(QWidget):
                 background-color: #e6f3ff;
             }
         """)
-        
+
         for movement in self.comparison_result.get('key_movements', []):
             self.add_movement_item(movement)
-        
+
         analysis_layout.addWidget(self.movements_list)
         analysis_widget.setLayout(analysis_layout)
-        tab_widget.addTab(analysis_widget, "动作分析")
+        tab_widget.addTab(analysis_widget, self.tr_text('analysis_tab'))
     
     def add_movement_item(self, movement):
         """添加动作项目"""
@@ -179,9 +215,9 @@ class ResultsWindow(QWidget):
         """创建详细测量标签页（仅实验模式）"""
         measurements_widget = QWidget()
         measurements_layout = QVBoxLayout()
-        
-        measurements_layout.addWidget(QLabel('详细测量数据:'))
-        
+
+        measurements_layout.addWidget(QLabel(self.tr_text('detailed_measurements')))
+
         measurements_text = QTextEdit()
         measurements_text.setReadOnly(True)
         measurements_text.setStyleSheet("""
@@ -191,48 +227,48 @@ class ResultsWindow(QWidget):
                 background-color: #f8f8f8;
             }
         """)
-        
+
         # 构建详细测量信息
         detailed_info = self.build_detailed_measurements_text()
         measurements_text.setText(detailed_info)
-        
+
         measurements_layout.addWidget(measurements_text)
         measurements_widget.setLayout(measurements_layout)
-        tab_widget.addTab(measurements_widget, "详细测量")
+        tab_widget.addTab(measurements_widget, self.tr_text('detailed_tab'))
     
     def create_pose_visualization_tab(self, tab_widget):
         """创建姿态可视化标签页（仅实验模式）"""
         pose_widget = QWidget()
         pose_layout = QVBoxLayout()
-        
-        pose_layout.addWidget(QLabel('姿态对比可视化:'))
-        
+
+        pose_layout.addWidget(QLabel(self.tr_text('pose_visualization')))
+
         # 检查是否有姿态图像
         has_pose_images = False
         for movement in self.comparison_result.get('key_movements', []):
             if movement.get('user_image') or movement.get('standard_image'):
                 has_pose_images = True
                 break
-        
+
         if has_pose_images:
             self.create_pose_image_display(pose_layout)
         else:
-            no_image_label = QLabel("暂无姿态可视化图像")
+            no_image_label = QLabel(self.tr_text('no_pose_image'))
             no_image_label.setAlignment(Qt.AlignCenter)
             no_image_label.setStyleSheet("color: #666; font-size: 14px;")
             pose_layout.addWidget(no_image_label)
-        
+
         pose_widget.setLayout(pose_layout)
-        tab_widget.addTab(pose_widget, "姿态可视化")
+        tab_widget.addTab(pose_widget, self.tr_text('pose_tab'))
     
     def create_pose_image_display(self, layout):
         """创建姿态图像显示"""
         image_layout = QHBoxLayout()
-        
+
         # 获取第一个有效的图像路径
         user_image_path = None
         standard_image_path = None
-        
+
         for movement in self.comparison_result.get('key_movements', []):
             if movement.get('user_image'):
                 user_image_path = movement['user_image']
@@ -240,10 +276,10 @@ class ResultsWindow(QWidget):
                 standard_image_path = movement['standard_image']
             if user_image_path and standard_image_path:
                 break
-        
+
         # 用户姿态图像
         if user_image_path and os.path.exists(user_image_path):
-            user_label = QLabel("用户姿态")
+            user_label = QLabel(self.tr_text('user_pose'))
             user_label.setAlignment(Qt.AlignCenter)
             user_image_label = QLabel()
             pixmap = QPixmap(user_image_path)
@@ -251,17 +287,17 @@ class ResultsWindow(QWidget):
                 scaled_pixmap = pixmap.scaled(400, 400, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 user_image_label.setPixmap(scaled_pixmap)
             user_image_label.setAlignment(Qt.AlignCenter)
-            
+
             user_frame = QFrame()
             user_frame_layout = QVBoxLayout()
             user_frame_layout.addWidget(user_label)
             user_frame_layout.addWidget(user_image_label)
             user_frame.setLayout(user_frame_layout)
             image_layout.addWidget(user_frame)
-        
+
         # 标准姿态图像
         if standard_image_path and os.path.exists(standard_image_path):
-            standard_label = QLabel("标准姿态")
+            standard_label = QLabel(self.tr_text('standard_pose'))
             standard_label.setAlignment(Qt.AlignCenter)
             standard_image_label = QLabel()
             pixmap = QPixmap(standard_image_path)
@@ -269,14 +305,14 @@ class ResultsWindow(QWidget):
                 scaled_pixmap = pixmap.scaled(400, 400, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 standard_image_label.setPixmap(scaled_pixmap)
             standard_image_label.setAlignment(Qt.AlignCenter)
-            
+
             standard_frame = QFrame()
             standard_frame_layout = QVBoxLayout()
             standard_frame_layout.addWidget(standard_label)
             standard_frame_layout.addWidget(standard_image_label)
             standard_frame.setLayout(standard_frame_layout)
             image_layout.addWidget(standard_frame)
-        
+
         layout.addLayout(image_layout)
     
     def build_detailed_measurements_text(self):

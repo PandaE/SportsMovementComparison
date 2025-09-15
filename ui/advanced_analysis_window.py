@@ -241,35 +241,54 @@ class StageAnalysisWidget(QWidget):
 class AdvancedAnalysisWindow(QMainWindow):
     """高级分析结果窗口"""
     
-    def __init__(self, comparison_results: dict, user_video_path: str, standard_video_path: str):
+    def __init__(self, comparison_results: dict, user_video_path: str, standard_video_path: str, language='zh'):
         super().__init__()
         self.comparison_results = comparison_results
         self.user_video_path = user_video_path
         self.standard_video_path = standard_video_path
-        
+        self.language = language
+        self.translations = {
+            'zh': {
+                'title': '高级分析结果 - 动作对比分析',
+                'video_preview': '🎬 视频预览区域',
+                'user_video': '用户视频',
+                'standard_video': '标准视频',
+                'stage_analysis': '📈 阶段分析区域',
+            },
+            'en': {
+                'title': 'Advanced Analysis - Movement Comparison',
+                'video_preview': '🎬 Video Preview',
+                'user_video': 'User Video',
+                'standard_video': 'Standard Video',
+                'stage_analysis': '📈 Stage Analysis',
+            }
+        }
         self.init_ui()
         self.setup_data()
+
+    def tr_text(self, key):
+        return self.translations.get(self.language, self.translations['zh']).get(key, key)
     
     def init_ui(self):
         """初始化UI"""
-        self.setWindowTitle("高级分析结果 - 动作对比分析")
+        self.setWindowTitle(self.tr_text('title'))
         self.setGeometry(100, 100, 1400, 800)
-        
+
         # 主窗口部件
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        
+
         # 主布局 - 水平分割器
         main_splitter = QSplitter(Qt.Horizontal)
         central_widget_layout = QVBoxLayout(central_widget)
         central_widget_layout.addWidget(main_splitter)
-        
+
         # 第一块：视频预览区域
         self.create_video_preview_area(main_splitter)
-        
+
         # 第二块：阶段分析区域
         self.create_stage_analysis_area(main_splitter)
-        
+
         # 设置分割器比例
         main_splitter.setSizes([500, 900])
     
@@ -277,38 +296,38 @@ class AdvancedAnalysisWindow(QMainWindow):
         """创建视频预览区域"""
         preview_widget = QWidget()
         preview_layout = QVBoxLayout(preview_widget)
-        
+
         # 标题
-        title_label = QLabel("🎬 视频预览区域")
+        title_label = QLabel(self.tr_text('video_preview'))
         title_font = QFont()
         title_font.setPointSize(14)
         title_font.setBold(True)
         title_label.setFont(title_font)
         preview_layout.addWidget(title_label)
-        
+
         # 用户视频播放器
-        user_group = QGroupBox("用户视频")
+        user_group = QGroupBox(self.tr_text('user_video'))
         user_layout = QVBoxLayout(user_group)
-        
+
         self.user_video_player = VideoPlayer()
         self.user_video_player.setMaximumHeight(200)
         user_layout.addWidget(self.user_video_player)
-        
+
         preview_layout.addWidget(user_group)
-        
+
         # 标准视频播放器
-        standard_group = QGroupBox("标准视频")
+        standard_group = QGroupBox(self.tr_text('standard_video'))
         standard_layout = QVBoxLayout(standard_group)
-        
+
         self.standard_video_player = VideoPlayer()
         self.standard_video_player.setMaximumHeight(200)
         standard_layout.addWidget(self.standard_video_player)
-        
+
         preview_layout.addWidget(standard_group)
-        
+
         # 添加伸缩空间
         preview_layout.addStretch()
-        
+
         parent_splitter.addWidget(preview_widget)
     
     def create_stage_analysis_area(self, parent_splitter):
@@ -318,25 +337,25 @@ class AdvancedAnalysisWindow(QMainWindow):
         scroll_area.setWidgetResizable(True)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        
+
         # 滚动内容
         scroll_content = QWidget()
         self.stages_layout = QVBoxLayout(scroll_content)
-        
+
         # 标题
-        title_label = QLabel("📈 阶段分析区域")
+        title_label = QLabel(self.tr_text('stage_analysis'))
         title_font = QFont()
         title_font.setPointSize(14)
         title_font.setBold(True)
         title_label.setFont(title_font)
         self.stages_layout.addWidget(title_label)
-        
+
         # 这里将添加各个阶段的分析组件
         self.stage_widgets = []
-        
+
         # 添加伸缩空间
         self.stages_layout.addStretch()
-        
+
         scroll_area.setWidget(scroll_content)
         parent_splitter.addWidget(scroll_area)
     

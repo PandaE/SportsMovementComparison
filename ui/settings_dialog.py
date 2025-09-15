@@ -19,7 +19,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("应用设置")
         self.setFixedSize(500, 400)
-        
+
         # 默认设置
         self.settings = {
             'experimental_enabled': True,
@@ -30,48 +30,191 @@ class SettingsDialog(QDialog):
             'angle_tolerance': 10.0,
             'enable_frame_enhancement': True,
             'save_analysis_images': True,
-            'auto_select_best_frames': True
+            'auto_select_best_frames': True,
+            'language': 'zh'  # 新增语言设置
         }
-        
+
+        # 文本映射（中英文）
+        self.translations = {
+            'zh': {
+                'title': '应用设置',
+                'basic_tab': '基本设置',
+                'language_label': '显示语言:',
+                'analysis_tab': '分析设置',
+                'video_tab': '视频处理',
+                'advanced_tab': '高级设置',
+                'ok': '确定',
+                'cancel': '取消',
+                'reset': '重置为默认',
+                'experimental': '启用高级姿态分析',
+                'pose_backend': '姿态检测后端:',
+                'angle_tolerance': '角度容差:',
+                'frame_extraction': '提取方法:',
+                'max_frames': '每视频最大帧数:',
+                'auto_select': '自动选择最佳质量帧',
+                'enhancement': '启用帧质量增强',
+                'quality_threshold': '质量阈值:',
+                'save_images': '保存分析图像',
+                'output_settings': '输出设置',
+                'system_info': '系统信息',
+                'exp_group': '实验功能',
+                'measure_group': '测量设置',
+                'frame_group': '帧提取设置',
+                'image_group': '图像处理',
+            },
+            'en': {
+                'title': 'Settings',
+                'basic_tab': 'Basic',
+                'language_label': 'Language:',
+                'analysis_tab': 'Analysis',
+                'video_tab': 'Video',
+                'advanced_tab': 'Advanced',
+                'ok': 'OK',
+                'cancel': 'Cancel',
+                'reset': 'Reset to Default',
+                'experimental': 'Enable Advanced Pose Analysis',
+                'pose_backend': 'Pose Backend:',
+                'angle_tolerance': 'Angle Tolerance:',
+                'frame_extraction': 'Extraction Method:',
+                'max_frames': 'Max Frames per Video:',
+                'auto_select': 'Auto Select Best Frames',
+                'enhancement': 'Enable Frame Enhancement',
+                'quality_threshold': 'Quality Threshold:',
+                'save_images': 'Save Analysis Images',
+                'output_settings': 'Output Settings',
+                'system_info': 'System Info',
+                'exp_group': 'Experimental Features',
+                'measure_group': 'Measurement Settings',
+                'frame_group': 'Frame Extraction',
+                'image_group': 'Image Processing',
+            }
+        }
+
         self.init_ui()
     
     def init_ui(self):
         """初始化界面"""
         layout = QVBoxLayout()
-        
+
         # 创建标签页
-        tab_widget = QTabWidget()
-        
+        self.tab_widget = QTabWidget()
+
+        # 基本设置标签页
+        self.create_basic_tab(self.tab_widget)
         # 分析设置标签页
-        self.create_analysis_tab(tab_widget)
-        
+        self.create_analysis_tab(self.tab_widget)
         # 视频处理标签页
-        self.create_video_tab(tab_widget)
-        
+        self.create_video_tab(self.tab_widget)
         # 高级设置标签页
-        self.create_advanced_tab(tab_widget)
-        
-        layout.addWidget(tab_widget)
-        
+        self.create_advanced_tab(self.tab_widget)
+
+        layout.addWidget(self.tab_widget)
+
         # 按钮
         button_layout = QHBoxLayout()
-        self.ok_button = QPushButton("确定")
-        self.cancel_button = QPushButton("取消")
-        self.reset_button = QPushButton("重置为默认")
-        
+        self.ok_button = QPushButton(self.tr_text('ok'))
+        self.cancel_button = QPushButton(self.tr_text('cancel'))
+        self.reset_button = QPushButton(self.tr_text('reset'))
+
         button_layout.addWidget(self.reset_button)
         button_layout.addStretch()
         button_layout.addWidget(self.cancel_button)
         button_layout.addWidget(self.ok_button)
-        
+
         layout.addLayout(button_layout)
-        
+
         # 连接信号
         self.ok_button.clicked.connect(self.accept_settings)
         self.cancel_button.clicked.connect(self.reject)
         self.reset_button.clicked.connect(self.reset_to_defaults)
-        
+
         self.setLayout(layout)
+
+        self.update_language(self.settings['language'])
+
+    def tr_text(self, key):
+        lang = self.settings.get('language', 'zh')
+        return self.translations.get(lang, self.translations['zh']).get(key, key)
+
+    def create_basic_tab(self, tab_widget):
+        """创建基本设置标签页"""
+        widget = QWidget()
+        layout = QVBoxLayout()
+
+        form_layout = QFormLayout()
+        self.language_combo = QComboBox()
+        self.language_combo.addItems(['中文', 'English'])
+        self.language_combo.setCurrentIndex(0 if self.settings['language'] == 'zh' else 1)
+        form_layout.addRow(self.tr_text('language_label'), self.language_combo)
+
+        layout.addLayout(form_layout)
+        layout.addStretch()
+        widget.setLayout(layout)
+        tab_widget.addTab(widget, self.tr_text('basic_tab'))
+
+        # 语言切换信号
+        self.language_combo.currentIndexChanged.connect(self.on_language_changed)
+
+    def on_language_changed(self, idx):
+        lang = 'zh' if idx == 0 else 'en'
+        self.settings['language'] = lang
+        self.update_language(lang)
+
+    def update_language(self, lang):
+        # 更新所有文本
+        self.setWindowTitle(self.tr_text('title'))
+        self.tab_widget.setTabText(0, self.tr_text('basic_tab'))
+        self.tab_widget.setTabText(1, self.tr_text('analysis_tab'))
+        self.tab_widget.setTabText(2, self.tr_text('video_tab'))
+        self.tab_widget.setTabText(3, self.tr_text('advanced_tab'))
+        self.ok_button.setText(self.tr_text('ok'))
+        self.cancel_button.setText(self.tr_text('cancel'))
+        self.reset_button.setText(self.tr_text('reset'))
+        # 更新各tab内容（如label）
+        self.update_tab_labels()
+
+    def update_tab_labels(self):
+        # 分析设置tab
+        try:
+            exp_group = self.tab_widget.widget(1).findChild(QGroupBox)
+            if exp_group:
+                exp_group.setTitle(self.tr_text('exp_group'))
+            measure_group = self.tab_widget.widget(1).findChildren(QGroupBox)[1]
+            if measure_group:
+                measure_group.setTitle(self.tr_text('measure_group'))
+            self.experimental_checkbox.setText(self.tr_text('experimental'))
+            self.pose_backend_combo.setItemText(0, 'mediapipe')
+            self.pose_backend_combo.setItemText(1, 'mock')
+            self.angle_tolerance_label.setText(f"{self.angle_tolerance_slider.value():.1f}°")
+        except Exception:
+            pass
+        # 视频处理tab
+        try:
+            frame_group = self.tab_widget.widget(2).findChild(QGroupBox)
+            if frame_group:
+                frame_group.setTitle(self.tr_text('frame_group'))
+            image_group = self.tab_widget.widget(2).findChildren(QGroupBox)[1]
+            if image_group:
+                image_group.setTitle(self.tr_text('image_group'))
+            self.extraction_method_combo.setItemText(0, 'uniform')
+            self.extraction_method_combo.setItemText(1, 'middle')
+            self.extraction_method_combo.setItemText(2, 'motion_based')
+            self.auto_select_checkbox.setText(self.tr_text('auto_select'))
+            self.enhancement_checkbox.setText(self.tr_text('enhancement'))
+            self.quality_threshold_label.setText(f"{self.quality_threshold_slider.value()/100:.2f}")
+        except Exception:
+            pass
+        # 高级设置tab
+        try:
+            output_group = self.tab_widget.widget(3).findChild(QGroupBox)
+            if output_group:
+                output_group.setTitle(self.tr_text('output_settings'))
+            self.save_images_checkbox.setText(self.tr_text('save_images'))
+            info_group = self.tab_widget.widget(3).findChildren(QGroupBox)[1]
+            if info_group:
+                info_group.setTitle(self.tr_text('system_info'))
+        except Exception:
+            pass
     
     def create_analysis_tab(self, tab_widget):
         """创建分析设置标签页"""
@@ -237,13 +380,14 @@ MediaPipe 版本: {mediapipe_version}
             'angle_tolerance': float(self.angle_tolerance_slider.value()),
             'enable_frame_enhancement': self.enhancement_checkbox.isChecked(),
             'save_analysis_images': self.save_images_checkbox.isChecked(),
-            'auto_select_best_frames': self.auto_select_checkbox.isChecked()
+            'auto_select_best_frames': self.auto_select_checkbox.isChecked(),
+            'language': 'zh' if self.language_combo.currentIndex() == 0 else 'en'
         }
     
     def apply_settings(self, settings_dict):
         """应用设置"""
         self.settings.update(settings_dict)
-        
+
         # 更新界面控件
         self.experimental_checkbox.setChecked(self.settings['experimental_enabled'])
         self.pose_backend_combo.setCurrentText(self.settings['pose_backend'])
@@ -254,6 +398,8 @@ MediaPipe 版本: {mediapipe_version}
         self.enhancement_checkbox.setChecked(self.settings['enable_frame_enhancement'])
         self.save_images_checkbox.setChecked(self.settings['save_analysis_images'])
         self.auto_select_checkbox.setChecked(self.settings['auto_select_best_frames'])
+        self.language_combo.setCurrentIndex(0 if self.settings['language'] == 'zh' else 1)
+        self.update_language(self.settings['language'])
     
     def reset_to_defaults(self):
         """重置为默认设置"""
@@ -266,9 +412,9 @@ MediaPipe 版本: {mediapipe_version}
             'angle_tolerance': 10.0,
             'enable_frame_enhancement': True,
             'save_analysis_images': True,
-            'auto_select_best_frames': True
+            'auto_select_best_frames': True,
+            'language': 'zh'
         }
-        
         self.apply_settings(default_settings)
     
     def accept_settings(self):

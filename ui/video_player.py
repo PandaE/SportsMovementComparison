@@ -20,22 +20,54 @@ class VideoPlayer(QWidget):
     # 信号定义
     frame_changed = pyqtSignal(int)  # 当前帧变化信号
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, language='zh'):
         super().__init__(parent)
-        
+
+        self.language = language
+        self.translations = {
+            'zh': {
+                'frame': '帧数:',
+                'time': '时间:',
+                'import_tip': '点击导入视频文件',
+                'file_not_exist': '视频文件不存在',
+                'cannot_open': '无法打开视频文件',
+                'cannot_read': '无法读取第 {frame} 帧',
+                'prev_tip': '上一帧',
+                'next_tip': '下一帧',
+                'play_tip': '播放/暂停',
+                'pause_tip': '暂停',
+                'play': '▶',
+                'pause': '⏸',
+            },
+            'en': {
+                'frame': 'Frame:',
+                'time': 'Time:',
+                'import_tip': 'Click to import video file',
+                'file_not_exist': 'File does not exist',
+                'cannot_open': 'Cannot open video file',
+                'cannot_read': 'Cannot read frame {frame}',
+                'prev_tip': 'Previous Frame',
+                'next_tip': 'Next Frame',
+                'play_tip': 'Play/Pause',
+                'pause_tip': 'Pause',
+                'play': '▶',
+                'pause': '⏸',
+            }
+        }
+
         # 视频相关属性
         self.video_path = None
         self.cap = None
         self.total_frames = 0
         self.current_frame = 0
         self.fps = 30.0
-        
+
         # 播放控制
         self.is_playing = False
         self.current_speed = 1.0
         self.play_timer = QTimer()
         self.play_timer.timeout.connect(self.next_frame)
-        
+
         self.init_ui()
         self.setup_connections()
     
@@ -71,13 +103,17 @@ class VideoPlayer(QWidget):
                 border-radius: 5px;
             }
         """)
-        self.video_label.setText("点击导入视频文件")
+        self.video_label.setText(self.tr_text('import_tip'))
         layout.addWidget(self.video_label)
     
     def create_frame_info(self, layout):
         """创建帧信息显示"""
         info_layout = QHBoxLayout()
-        
+
+        # 标签
+        self.frame_label = QLabel(self.tr_text('frame'))
+        self.time_label = QLabel(self.tr_text('time'))
+
         # 当前帧/总帧数
         self.frame_info_label = QLabel("0 / 0")
         self.frame_info_label.setAlignment(Qt.AlignCenter)
@@ -86,20 +122,34 @@ class VideoPlayer(QWidget):
         frame_font.setBold(True)
         self.frame_info_label.setFont(frame_font)
         self.frame_info_label.setStyleSheet("color: #2c3e50;")
-        
+
         # 时间信息
         self.time_info_label = QLabel("00:00 / 00:00")
         self.time_info_label.setAlignment(Qt.AlignCenter)
         self.time_info_label.setFont(frame_font)
         self.time_info_label.setStyleSheet("color: #34495e;")
-        
-        info_layout.addWidget(QLabel("帧数:"))
+
+        info_layout.addWidget(self.frame_label)
         info_layout.addWidget(self.frame_info_label)
         info_layout.addStretch()
-        info_layout.addWidget(QLabel("时间:"))
+        info_layout.addWidget(self.time_label)
         info_layout.addWidget(self.time_info_label)
-        
+
         layout.addLayout(info_layout)
+    def tr_text(self, key):
+        return self.translations.get(self.language, self.translations['zh']).get(key, key)
+
+    def update_language(self, lang):
+        self.language = lang
+        self.frame_label.setText(self.tr_text('frame'))
+        self.time_label.setText(self.tr_text('time'))
+        self.video_label.setText(self.tr_text('import_tip'))
+        self.prev_frame_btn.setToolTip(self.tr_text('prev_tip'))
+        self.next_frame_btn.setToolTip(self.tr_text('next_tip'))
+        self.play_pause_btn.setToolTip(self.tr_text('play_tip'))
+        self.play_pause_btn.setText(self.tr_text('play') if not self.is_playing else self.tr_text('pause'))
+        self.speed_btn.setToolTip('播放速度' if lang == 'zh' else 'Speed')
+        self.update_info_display()
     
     def create_progress_bar(self, layout):
         """创建进度条"""
@@ -138,12 +188,12 @@ class VideoPlayer(QWidget):
         # 帧控制按钮
         self.prev_frame_btn = QPushButton("⏮")
         self.prev_frame_btn.setFixedSize(35, 35)
-        self.prev_frame_btn.setToolTip("上一帧")
+        self.prev_frame_btn.setToolTip(self.tr_text('prev_tip'))
         self.prev_frame_btn.setEnabled(False)
-        
-        self.play_pause_btn = QPushButton("▶")
+
+        self.play_pause_btn = QPushButton(self.tr_text('play'))
         self.play_pause_btn.setFixedSize(45, 45)
-        self.play_pause_btn.setToolTip("播放/暂停")
+        self.play_pause_btn.setToolTip(self.tr_text('play_tip'))
         self.play_pause_btn.setEnabled(False)
         self.play_pause_btn.setStyleSheet("""
             QPushButton {
@@ -163,16 +213,16 @@ class VideoPlayer(QWidget):
                 background-color: #bdc3c7;
             }
         """)
-        
+
         self.next_frame_btn = QPushButton("⏭")
         self.next_frame_btn.setFixedSize(35, 35)
-        self.next_frame_btn.setToolTip("下一帧")
+        self.next_frame_btn.setToolTip(self.tr_text('next_tip'))
         self.next_frame_btn.setEnabled(False)
-        
+
         # 速度控制
         self.speed_btn = QPushButton("1X")
         self.speed_btn.setFixedSize(40, 35)
-        self.speed_btn.setToolTip("播放速度")
+        self.speed_btn.setToolTip('播放速度' if self.language == 'zh' else 'Speed')
         self.speed_btn.setEnabled(False)
         
         # 布局
@@ -199,33 +249,33 @@ class VideoPlayer(QWidget):
     def set_video(self, file_path):
         """设置视频文件"""
         if not os.path.exists(file_path):
-            self.video_label.setText("视频文件不存在")
+            self.video_label.setText(self.tr_text('file_not_exist'))
             return
-        
+
         # 释放之前的视频
         if self.cap:
             self.cap.release()
-        
+
         # 打开新视频
         self.cap = cv2.VideoCapture(file_path)
         if not self.cap.isOpened():
-            self.video_label.setText("无法打开视频文件")
+            self.video_label.setText(self.tr_text('cannot_open'))
             return
-        
+
         self.video_path = file_path
-        
+
         # 获取视频信息
         self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
         self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30.0
-        
+
         # 更新UI
         self.progress_bar.setRange(0, self.total_frames - 1)
         self.current_frame = 0
         self.progress_bar.setValue(0)
-        
+
         # 启用控件
         self.enable_controls(True)
-        
+
         # 显示第一帧
         self.show_current_frame()
         self.update_info_display()
@@ -241,22 +291,22 @@ class VideoPlayer(QWidget):
         """显示当前帧"""
         if not self.cap:
             return
-        
+
         # 设置视频位置
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.current_frame)
         ret, frame = self.cap.read()
-        
+
         if ret:
             # 转换为Qt格式并显示
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             h, w, ch = rgb_frame.shape
             bytes_per_line = ch * w
-            
+
             # 创建QPixmap
             from PyQt5.QtGui import QImage
             qt_image = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
             pixmap = QPixmap.fromImage(qt_image)
-            
+
             # 缩放以适应标签大小
             label_size = self.video_label.size()
             scaled_pixmap = pixmap.scaled(
@@ -265,10 +315,10 @@ class VideoPlayer(QWidget):
                 Qt.KeepAspectRatio, 
                 Qt.SmoothTransformation
             )
-            
+
             self.video_label.setPixmap(scaled_pixmap)
         else:
-            self.video_label.setText(f"无法读取第 {self.current_frame} 帧")
+            self.video_label.setText(self.tr_text('cannot_read').format(frame=self.current_frame))
     
     def update_info_display(self):
         """更新信息显示"""
@@ -336,15 +386,15 @@ class VideoPlayer(QWidget):
         """开始播放"""
         if self.cap and self.current_frame < self.total_frames - 1:
             self.is_playing = True
-            self.play_pause_btn.setText("⏸")
-            self.play_pause_btn.setToolTip("暂停")
+            self.play_pause_btn.setText(self.tr_text('pause'))
+            self.play_pause_btn.setToolTip(self.tr_text('pause_tip'))
             self.start_playback()
     
     def pause(self):
         """暂停播放"""
         self.is_playing = False
-        self.play_pause_btn.setText("▶")
-        self.play_pause_btn.setToolTip("播放")
+        self.play_pause_btn.setText(self.tr_text('play'))
+        self.play_pause_btn.setToolTip(self.tr_text('play_tip'))
         self.play_timer.stop()
     
     def start_playback(self):
