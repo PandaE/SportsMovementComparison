@@ -93,6 +93,21 @@ class FrameComparator:
                 if target_pt and ref_pt:
                     return ref_pt.y - target_pt.y  # y坐标越小越靠上，所以ref_y - target_y为正表示target在上方
         
+        elif rule.measurement_type == "vertical_distance":
+            # 垂直距离测量：关键点相对于参考点的垂直距离
+            if len(rule.keypoints) >= 1 and rule.reference_point:
+                target_pt = pose.get_keypoint(rule.keypoints[0])
+                ref_pt = pose.get_keypoint(rule.reference_point)
+                if target_pt and ref_pt:
+                    distance = ref_pt.y - target_pt.y  # y坐标越小越靠上
+                    # 根据方向调整符号
+                    if rule.direction == "up":
+                        return distance   # target在ref上方为正值
+                    elif rule.direction == "down":
+                        return -distance  # target在ref下方为正值
+                    else:
+                        return distance   # 默认上方为正
+        
         elif rule.measurement_type == "horizontal_distance":
             # 水平距离测量：关键点相对于参考点的水平距离
             if len(rule.keypoints) >= 1 and rule.reference_point:
@@ -101,7 +116,7 @@ class FrameComparator:
                 if target_pt and ref_pt:
                     distance = target_pt.x - ref_pt.x
                     # 根据方向调整符号
-                    if rule.direction == "backward":
+                    if rule.direction == "back" or rule.direction == "backward":
                         return -distance  # 向后为正值
                     elif rule.direction == "forward":
                         return distance   # 向前为正值
