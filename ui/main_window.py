@@ -221,7 +221,8 @@ class MainWindow(QWidget):
                 self.results_window = AdvancedAnalysisWindow(
                     result, 
                     self.user_video_path, 
-                    self.standard_video_path
+                    self.standard_video_path,
+                    self.language
                 )
             else:
                 self.results_window = ResultsWindow(

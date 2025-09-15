@@ -22,20 +22,63 @@ class StageAnalysisWidget(QWidget):
     
     def __init__(self, stage_name: str, user_frame: int, standard_frame: int, 
                  user_video_path: str, standard_video_path: str, 
-                 comparison_results: dict = None):
+                 comparison_results: dict = None, language='zh'):
         super().__init__()
         self.stage_name = stage_name
         self.user_video_path = user_video_path
         self.standard_video_path = standard_video_path
         self.comparison_results = comparison_results or {}
-        
+        self.language = language
+        self.translations = {
+            'zh': {
+                'frame': '帧数:',
+                'update': '更新',
+                'user_video': '用户视频',
+                'standard_video': '标准视频',
+                'compare_group': '关键帧对比',
+                'result_group': '对比分析结果',
+                'loading': '加载中...',
+                'no_data': '暂无对比数据',
+                'score': '📈 阶段得分',
+                'status': '📊 分析结果',
+                'measurements': '📏 测量对比:',
+                'user': '用户',
+                'standard': '标准',
+                'no_detail': '暂无详细对比数据',
+                'unknown_rule': '未知规则',
+                'update_btn': '更新',
+                'show_fail': '显示失败',
+            },
+            'en': {
+                'frame': 'Frame:',
+                'update': 'Update',
+                'user_video': 'User Video',
+                'standard_video': 'Standard Video',
+                'compare_group': 'Key Frame Comparison',
+                'result_group': 'Comparison Results',
+                'loading': 'Loading...',
+                'no_data': 'No comparison data',
+                'score': '📈 Stage Score',
+                'status': '📊 Analysis',
+                'measurements': '📏 Measurements:',
+                'user': 'User',
+                'standard': 'Standard',
+                'no_detail': 'No detailed comparison',
+                'unknown_rule': 'Unknown Rule',
+                'update_btn': 'Update',
+                'show_fail': 'Display failed',
+            }
+        }
         self.init_ui()
         self.set_frames(user_frame, standard_frame)
+
+    def tr_text(self, key):
+        return self.translations.get(self.language, self.translations['zh']).get(key, key)
     
     def init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
-        
+
         # 阶段标题
         title_label = QLabel(f"📊 {self.stage_name}")
         title_font = QFont()
@@ -43,32 +86,32 @@ class StageAnalysisWidget(QWidget):
         title_font.setBold(True)
         title_label.setFont(title_font)
         layout.addWidget(title_label)
-        
+
         # 关键帧对比区域
-        frames_group = QGroupBox("关键帧对比")
+        frames_group = QGroupBox(self.tr_text('compare_group'))
         frames_layout = QHBoxLayout(frames_group)
-        
+
         # 用户视频帧
-        user_frame_widget = self.create_frame_widget("用户视频", True)
+        user_frame_widget = self.create_frame_widget(self.tr_text('user_video'), True)
         frames_layout.addWidget(user_frame_widget)
-        
+
         # 标准视频帧
-        standard_frame_widget = self.create_frame_widget("标准视频", False)
+        standard_frame_widget = self.create_frame_widget(self.tr_text('standard_video'), False)
         frames_layout.addWidget(standard_frame_widget)
-        
+
         layout.addWidget(frames_group)
-        
+
         # 对比结果区域
-        results_group = QGroupBox("对比分析结果")
+        results_group = QGroupBox(self.tr_text('result_group'))
         results_layout = QVBoxLayout(results_group)
-        
+
         self.results_text = QTextEdit()
         self.results_text.setMaximumHeight(100)
         self.results_text.setReadOnly(True)
         results_layout.addWidget(self.results_text)
-        
+
         layout.addWidget(results_group)
-        
+
         # 更新对比结果显示
         self.update_comparison_results()
     
@@ -76,52 +119,50 @@ class StageAnalysisWidget(QWidget):
         """创建单个帧显示组件"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
-        
+
         # 标题
         title_label = QLabel(title)
         title_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(title_label)
-        
+
         # 图像显示
         image_label = QLabel()
         image_label.setFixedSize(200, 150)
         image_label.setStyleSheet("border: 1px solid gray; background-color: #f0f0f0;")
         image_label.setAlignment(Qt.AlignCenter)
-        image_label.setText("加载中...")
-        
+        image_label.setText(self.tr_text('loading'))
+
         if is_user:
             self.user_image_label = image_label
         else:
             self.standard_image_label = image_label
-        
+
         layout.addWidget(image_label)
-        
+
         # 帧数控制
         frame_control_layout = QHBoxLayout()
-        
-        frame_label = QLabel("帧数:")
+
+        frame_label = QLabel(self.tr_text('frame'))
         frame_control_layout.addWidget(frame_label)
-        
+
         frame_spinbox = QSpinBox()
         frame_spinbox.setMinimum(0)
         frame_spinbox.setMaximum(9999)
-        
+
         if is_user:
             self.user_frame_spinbox = frame_spinbox
-            # 不自动连接valueChanged信号
         else:
             self.standard_frame_spinbox = frame_spinbox
-            # 不自动连接valueChanged信号
-        
+
         frame_control_layout.addWidget(frame_spinbox)
-        
+
         # 更新按钮
-        update_btn = QPushButton("更新")
+        update_btn = QPushButton(self.tr_text('update_btn'))
         update_btn.clicked.connect(self.on_update_clicked)
         frame_control_layout.addWidget(update_btn)
-        
+
         layout.addLayout(frame_control_layout)
-        
+
         return widget
     
     def set_frames(self, user_frame: int, standard_frame: int):
@@ -162,29 +203,29 @@ class StageAnalysisWidget(QWidget):
         try:
             # 转换颜色空间
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
+
             # 调整大小
             h, w, ch = rgb_frame.shape
             target_w, target_h = 200, 150
-            
+
             # 计算缩放比例，保持宽高比
             scale = min(target_w/w, target_h/h)
             new_w, new_h = int(w*scale), int(h*scale)
-            
+
             resized = cv2.resize(rgb_frame, (new_w, new_h))
-            
+
             # 转换为QPixmap - 修复图像格式
             from PyQt5.QtGui import QImage
             bytes_per_line = 3 * new_w
             q_image = QImage(resized.data, new_w, new_h, bytes_per_line, QImage.Format_RGB888)
             q_pixmap = QPixmap.fromImage(q_image)
-            
+
             label.setPixmap(q_pixmap)
             label.setScaledContents(True)
-            
+
         except Exception as e:
             print(f"显示帧失败: {e}")
-            label.setText("显示失败")
+            label.setText(self.tr_text('show_fail'))
     
     def on_update_clicked(self):
         """点击更新按钮时的处理"""
@@ -205,36 +246,36 @@ class StageAnalysisWidget(QWidget):
     def update_comparison_results(self):
         """更新对比结果显示"""
         if not self.comparison_results:
-            self.results_text.setText("暂无对比数据")
+            self.results_text.setText(self.tr_text('no_data'))
             return
-        
+
         # 构建对比结果文本
         results_text = ""
-        
+
         # 显示阶段信息
         stage_info = self.comparison_results.get('stage_info', {})
         if stage_info:
             score = stage_info.get('score', 0)
-            status = stage_info.get('status', '未知')
-            results_text += f"📈 阶段得分: {score:.1f}%\n"
-            results_text += f"📊 分析结果: {status}\n\n"
-        
+            status = stage_info.get('status', '')
+            results_text += f"{self.tr_text('score')}: {score:.1f}%\n"
+            results_text += f"{self.tr_text('status')}: {status}\n\n"
+
         # 显示测量对比
         measurements = self.comparison_results.get('measurements', [])
         if measurements:
-            results_text += "📏 测量对比:\n"
+            results_text += f"{self.tr_text('measurements')}\n"
             for measurement in measurements:
-                rule_name = measurement.get('rule_name', '未知规则')
+                rule_name = measurement.get('rule_name', self.tr_text('unknown_rule'))
                 user_value = measurement.get('user_value', 0)
                 standard_value = measurement.get('standard_value', 0)
                 is_within_range = measurement.get('is_within_range', False)
-                
+
                 status_icon = "✅" if is_within_range else "❌"
-                results_text += f"  {status_icon} {rule_name}: 用户 {user_value:.1f}° vs 标准 {standard_value:.1f}°\n"
-        
+                results_text += f"  {status_icon} {rule_name}: {self.tr_text('user')} {user_value:.1f}° vs {self.tr_text('standard')} {standard_value:.1f}°\n"
+
         if not results_text.strip():
-            results_text = "暂无详细对比数据"
-        
+            results_text = self.tr_text('no_detail')
+
         self.results_text.setText(results_text)
 
 
@@ -389,7 +430,8 @@ class AdvancedAnalysisWindow(QMainWindow):
                 standard_frame=stage_data['standard_frame'],
                 user_video_path=self.user_video_path,
                 standard_video_path=self.standard_video_path,
-                comparison_results=stage_data['results']
+                comparison_results=stage_data['results'],
+                language=self.language
             )
             
             # 连接信号
