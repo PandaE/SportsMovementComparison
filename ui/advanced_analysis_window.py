@@ -29,6 +29,14 @@ class StageAnalysisWidget(QWidget):
         self.standard_video_path = standard_video_path
         self.comparison_results = comparison_results or {}
         self.language = language
+        
+        # 阶段名称映射：英文内部名称 -> 中文显示名称
+        self.stage_name_mapping = {
+            'setup_stage': '架拍阶段结束',
+            'backswing_stage': '引拍阶段结束', 
+            'power_stage': '发力阶段结束'
+        }
+        
         self.translations = {
             'zh': {
                 'frame': '帧数:',
@@ -75,12 +83,17 @@ class StageAnalysisWidget(QWidget):
     def tr_text(self, key):
         return self.translations.get(self.language, self.translations['zh']).get(key, key)
     
+    def get_display_stage_name(self):
+        """获取阶段的显示名称"""
+        return self.stage_name_mapping.get(self.stage_name, self.stage_name)
+
     def init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
 
         # 阶段标题
-        title_label = QLabel(f"📊 {self.stage_name}")
+        display_name = self.stage_name_mapping.get(self.stage_name, self.stage_name)
+        title_label = QLabel(f"📊 {display_name}")
         title_font = QFont()
         title_font.setPointSize(12)
         title_font.setBold(True)
@@ -237,7 +250,7 @@ class StageAnalysisWidget(QWidget):
         standard_frame = self.standard_frame_spinbox.value()
         self.frameChanged.emit(self.stage_name, user_frame, standard_frame)
         
-        print(f"🔄 手动更新阶段 '{self.stage_name}' 的帧数: 用户帧 {user_frame}, 标准帧 {standard_frame}")
+        print(f"🔄 手动更新阶段 '{self.get_display_stage_name()}' 的帧数: 用户帧 {user_frame}, 标准帧 {standard_frame}")
     
     def update_frames(self):
         """更新帧显示（兼容旧接口）"""

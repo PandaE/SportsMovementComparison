@@ -16,6 +16,21 @@ class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.language = 'zh'  # 默认中文
+        
+        # 显示文本到内部参数的映射
+        self.sport_mapping = {
+            '羽毛球': 'badminton',
+            'badminton': 'badminton',
+            'Badminton': 'badminton'
+        }
+        
+        self.action_mapping = {
+            '正手高远球': 'clear',
+            'Clear Shot (High Long Shot)': 'clear',
+            'clear': 'clear',
+            'forehand_clear': 'clear'
+        }
+        
         self.translations = {
             'zh': {
                 'title': '运动动作对比分析',
@@ -209,8 +224,13 @@ class MainWindow(QWidget):
         # 根据当前引擎类型进行分析
         if self.current_engine == self.experimental_engine and hasattr(self.current_engine, 'compare'):
             # 使用实验引擎，传递运动和动作类型
-            sport = self.sport_combo.currentText().lower()
-            action = self.action_combo.currentText().lower()
+            sport_display = self.sport_combo.currentText()
+            action_display = self.action_combo.currentText()
+            
+            # 映射显示文本到内部参数
+            sport = self.sport_mapping.get(sport_display, sport_display.lower())
+            action = self.action_mapping.get(action_display, action_display.lower())
+            
             result = self.current_engine.compare(
                 self.user_video_path, 
                 self.standard_video_path, 
