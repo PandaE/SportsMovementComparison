@@ -22,7 +22,7 @@ def create_test_data():
         'score': 78,
         'detailed_score': 0.78,
         'stages': {
-            '架拍阶段结束': {
+            'setup_stage': {
                 'user_frame': 30,
                 'standard_frame': 25,
                 'stage_info': {
@@ -46,7 +46,7 @@ def create_test_data():
                     }
                 ]
             },
-            '击球瞬间': {
+            'power_stage': {
                 'user_frame': 60,
                 'standard_frame': 55,
                 'stage_info': {
@@ -70,7 +70,7 @@ def create_test_data():
                     }
                 ]
             },
-            '随挥完成': {
+            'backswing_stage': {
                 'user_frame': 90,
                 'standard_frame': 85,
                 'stage_info': {

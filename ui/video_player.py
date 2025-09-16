@@ -1,18 +1,27 @@
 """
 video_player.py
-Enhanced video player widget with frame-level navigation for PyQt5.
+Enhanced video player widget with frame-level navigation and pose visualization for PyQt5.
 """
 import cv2
 import numpy as np
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QSlider, 
-    QLabel, QFrame, QSizePolicy
+    QLabel, QFrame, QSizePolicy, QCheckBox
 )
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtMultimediaWidgets import QVideoWidget
 from PyQt5.QtCore import QUrl, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QIcon, QPixmap, QFont
 import os
+
+# 尝试导入姿态检测相关模块
+try:
+    from core.experimental.frame_analyzer.pose_extractor import PoseExtractor
+    from core.utils.image_utils import ImageUtils
+    POSE_AVAILABLE = True
+except ImportError as e:
+    print(f"姿态检测模块导入失败: {e}")
+    POSE_AVAILABLE = False
 
 class VideoPlayer(QWidget):
     """增强的视频播放器，支持帧级导航"""
@@ -38,6 +47,7 @@ class VideoPlayer(QWidget):
                 'pause_tip': '暂停',
                 'play': '▶',
                 'pause': '⏸',
+                'show_pose': '显示姿态',
             },
             'en': {
                 'frame': 'Frame:',
@@ -52,6 +62,7 @@ class VideoPlayer(QWidget):
                 'pause_tip': 'Pause',
                 'play': '▶',
                 'pause': '⏸',
+                'show_pose': 'Show Pose',
             }
         }
 
@@ -67,6 +78,17 @@ class VideoPlayer(QWidget):
         self.current_speed = 1.0
         self.play_timer = QTimer()
         self.play_timer.timeout.connect(self.next_frame)
+
+        # 姿态检测相关
+        self.pose_extractor = None
+        self.show_pose = False
+        self.pose_color = (0, 255, 0)  # 默认绿色
+        if POSE_AVAILABLE:
+            try:
+                self.pose_extractor = PoseExtractor(backend="mediapipe")
+                print("姿态检测器初始化成功")
+            except Exception as e:
+                print(f"姿态检测器初始化失败: {e}")
 
         self.init_ui()
         self.setup_connections()
@@ -183,7 +205,10 @@ class VideoPlayer(QWidget):
     
     def create_controls(self, layout):
         """创建控制按钮"""
-        controls_layout = QHBoxLayout()
+        controls_layout = QVBoxLayout()
+        
+        # 第一行：播放控制按钮
+        playback_layout = QHBoxLayout()
         
         # 帧控制按钮
         self.prev_frame_btn = QPushButton("⏮")
@@ -225,13 +250,29 @@ class VideoPlayer(QWidget):
         self.speed_btn.setToolTip('播放速度' if self.language == 'zh' else 'Speed')
         self.speed_btn.setEnabled(False)
         
-        # 布局
-        controls_layout.addStretch()
-        controls_layout.addWidget(self.prev_frame_btn)
-        controls_layout.addWidget(self.play_pause_btn)
-        controls_layout.addWidget(self.next_frame_btn)
-        controls_layout.addWidget(self.speed_btn)
-        controls_layout.addStretch()
+        # 播放控制布局
+        playback_layout.addStretch()
+        playback_layout.addWidget(self.prev_frame_btn)
+        playback_layout.addWidget(self.play_pause_btn)
+        playback_layout.addWidget(self.next_frame_btn)
+        playback_layout.addWidget(self.speed_btn)
+        playback_layout.addStretch()
+        
+        controls_layout.addLayout(playback_layout)
+        
+        # 第二行：姿态显示控制
+        if POSE_AVAILABLE and self.pose_extractor:
+            pose_layout = QHBoxLayout()
+            
+            self.pose_checkbox = QCheckBox(self.tr_text('show_pose'))
+            self.pose_checkbox.setChecked(False)
+            self.pose_checkbox.stateChanged.connect(self.on_pose_display_changed)
+            
+            pose_layout.addStretch()
+            pose_layout.addWidget(self.pose_checkbox)
+            pose_layout.addStretch()
+            
+            controls_layout.addLayout(pose_layout)
         
         layout.addLayout(controls_layout)
     
@@ -297,14 +338,35 @@ class VideoPlayer(QWidget):
         ret, frame = self.cap.read()
 
         if ret:
-            # 转换为Qt格式并显示
+            # 转换为RGB格式用于显示
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            h, w, ch = rgb_frame.shape
+            display_frame = rgb_frame.copy()
+
+            # 如果启用姿态显示且姿态检测器可用，进行姿态检测和绘制
+            if self.show_pose and self.pose_extractor and POSE_AVAILABLE:
+                try:
+                    # 从BGR图像中提取姿态（pose_extractor期望BGR格式）
+                    pose = self.pose_extractor.extract_pose_from_image(frame, self.current_frame)
+                    
+                    if pose:
+                        # 在RGB图像上绘制火柴人
+                        display_frame = ImageUtils.draw_stick_figure(
+                            display_frame, pose, 
+                            color=self.pose_color,  # RGB格式的颜色
+                            thickness=3,
+                            point_radius=5,
+                            confidence_threshold=0.5
+                        )
+                        
+                except Exception as e:
+                    print(f"姿态检测失败: {e}")
+
+            h, w, ch = display_frame.shape
             bytes_per_line = ch * w
 
             # 创建QPixmap
             from PyQt5.QtGui import QImage
-            qt_image = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
+            qt_image = QImage(display_frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
             pixmap = QPixmap.fromImage(qt_image)
 
             # 缩放以适应标签大小
@@ -436,3 +498,28 @@ class VideoPlayer(QWidget):
         if self.cap:
             self.cap.release()
         super().closeEvent(event)
+    
+    def on_pose_display_changed(self, state):
+        """姿态显示开关改变时的处理"""
+        self.show_pose = (state == Qt.Checked)
+        print(f"姿态显示{'开启' if self.show_pose else '关闭'}")
+        
+        # 重新显示当前帧
+        self.show_current_frame()
+    
+    def set_pose_color(self, color):
+        """设置火柴人颜色 (RGB格式)"""
+        self.pose_color = color
+        if self.show_pose:
+            self.show_current_frame()
+    
+    def enable_pose_display(self, enabled=True):
+        """启用/禁用姿态显示功能"""
+        if hasattr(self, 'pose_checkbox'):
+            self.pose_checkbox.setEnabled(enabled)
+    
+    def set_pose_display(self, enabled):
+        """设置姿态显示状态"""
+        if hasattr(self, 'pose_checkbox'):
+            self.pose_checkbox.setChecked(enabled)
+        self.show_pose = enabled

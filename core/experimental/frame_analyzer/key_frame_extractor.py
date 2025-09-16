@@ -227,12 +227,12 @@ class KeyFrameExtractor:
         Args:
             video_path: 视频文件路径
             sport: 运动类型 (如 "badminton")
-            action: 动作类型 (如 "clear", "正手高远球")
+            action: 动作类型 (如 "clear", "forehand_clear")
             
         Returns:
             Dict[stage_name, frame_number] - 阶段名称到帧号的映射
         """
-        if sport.lower() == "badminton" and ("clear" in action.lower() or "正手高远" in action):
+        if sport.lower() == "badminton" and "clear" in action.lower():
             if self.use_intelligent_extraction:
                 return self._extract_badminton_clear_frames_intelligent(video_path)
             else:
@@ -245,9 +245,9 @@ class KeyFrameExtractor:
         基于运动学特征的羽毛球正手高远球关键帧提取
         
         提取策略：
-        - 架拍阶段结束: 重心最靠后的帧
-        - 引拍阶段结束: 两个阶段之间小臂角速度最低点  
-        - 发力阶段结束: 大臂或小臂角速度最高点
+        - setup_stage: 重心最靠后的帧
+        - backswing_stage: 两个阶段之间小臂角速度最低点  
+        - power_stage: 大臂或小臂角速度最高点
         
         Args:
             video_path: 视频文件路径
@@ -294,18 +294,18 @@ class KeyFrameExtractor:
         arm_angular_vel = motion_data['arm_angular_velocity']
         forearm_angular_vel = motion_data['forearm_angular_velocity']
         
-        # 1. 架拍阶段结束：重心最靠后的帧
+        # 1. setup_stage：重心最靠后的帧
         # 找到重心X坐标最小值（最靠左/后）
         setup_idx = np.argmin(com_x)
         setup_frame = frame_numbers[setup_idx]
         
-        # 2. 发力阶段结束：大臂或小臂角速度最高点
+        # 2. power_stage：大臂或小臂角速度最高点
         # 计算综合角速度（大臂和小臂的绝对值之和）
         combined_angular_vel = [abs(a) + abs(f) for a, f in zip(arm_angular_vel, forearm_angular_vel)]
         power_idx = np.argmax(combined_angular_vel)
         power_frame = frame_numbers[power_idx]
         
-        # 3. 引拍阶段结束：架拍和发力之间小臂角速度最低点
+        # 3. backswing_stage：架拍和发力之间小臂角速度最低点
         # 确定搜索范围
         start_idx = min(setup_idx, power_idx)
         end_idx = max(setup_idx, power_idx)
@@ -333,9 +333,9 @@ class KeyFrameExtractor:
         frames.sort()
         
         key_frames = {
-            "架拍阶段结束": frames[0],
-            "引拍阶段结束": frames[1], 
-            "发力阶段结束": frames[2]
+            "setup_stage": frames[0],
+            "backswing_stage": frames[1], 
+            "power_stage": frames[2]
         }
         
         # 调试信息
@@ -389,9 +389,9 @@ class KeyFrameExtractor:
         羽毛球正手高远球关键帧提取（简单时间等分方法）
         
         使用简单的时间等分策略：
-        - 架拍阶段结束: 30% 位置
-        - 引拍阶段结束: 50% 位置  
-        - 发力阶段结束: 80% 位置
+        - setup_stage: 30% 位置
+        - backswing_stage: 50% 位置  
+        - power_stage: 80% 位置
         
         Args:
             video_path: 视频文件路径
@@ -408,9 +408,9 @@ class KeyFrameExtractor:
         
         # 定义各阶段的时间比例
         stage_ratios = {
-            "架拍阶段结束": 0.30,  # 30% 位置
-            "引拍阶段结束": 0.50,  # 50% 位置
-            "发力阶段结束": 0.80   # 80% 位置
+            "setup_stage": 0.30,  # 30% 位置
+            "backswing_stage": 0.50,  # 50% 位置
+            "power_stage": 0.80   # 80% 位置
         }
         
         # 计算各阶段的帧位置
@@ -505,7 +505,6 @@ class KeyFrameExtractor:
             List[Tuple[sport, action]] - 支持的运动动作组合
         """
         return [
-            ("Badminton", "正手高远球"),
             ("badminton", "clear"),
             ("badminton", "forehand_clear")
         ]
@@ -521,11 +520,11 @@ class KeyFrameExtractor:
         Returns:
             Dict[stage_name, ratio] - 阶段名称到时间比例的映射
         """
-        if sport.lower() == "badminton" and ("clear" in action.lower() or "正手高远" in action):
+        if sport.lower() == "badminton" and "clear" in action.lower():
             return {
-                "架拍阶段结束": 0.30,
-                "引拍阶段结束": 0.50,
-                "发力阶段结束": 0.80
+                "setup_stage": 0.30,
+                "backswing_stage": 0.50,
+                "power_stage": 0.80
             }
         else:
             raise ValueError(f"不支持的运动动作组合: {sport} - {action}")

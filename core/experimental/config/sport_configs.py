@@ -100,19 +100,19 @@ class SportConfigs:
             description="羽毛球正手高远球技术动作",
             stages=[
                 StageConfig(
-                    name="架拍阶段结束",
+                    name="setup_stage",
                     description="准备击球的架拍姿势",
                     measurements=setup_measurements,
                     weight=0.3  # 架拍阶段权重30%
                 ),
                 StageConfig(
-                    name="引拍阶段结束",
+                    name="backswing_stage",
                     description="拍子向后引拍到位的姿势",
                     measurements=backswing_measurements,
                     weight=0.2  # 引拍阶段权重20%
                 ),
                 StageConfig(
-                    name="发力阶段结束",
+                    name="power_stage",
                     description="击球瞬间的发力姿势",
                     measurements=power_measurements,
                     weight=0.5  # 发力阶段权重50%，最重要的击球瞬间
@@ -123,7 +123,21 @@ class SportConfigs:
     @staticmethod
     def get_config(sport: str, action: str) -> ActionConfig:
         """根据运动和动作获取配置"""
-        if sport.lower() == "badminton" and ("clear" in action.lower() or "正手高远" in action):
+        # 支持中英文运动名称匹配
+        is_badminton = (
+            sport.lower() == "badminton" or 
+            "羽毛球" in sport or 
+            "badminton" in sport.lower()
+        )
+        
+        # 支持中英文动作名称匹配
+        is_clear_shot = (
+            "clear" in action.lower() or 
+            "正手高远" in action or
+            "高远球" in action
+        )
+        
+        if is_badminton and is_clear_shot:
             return SportConfigs.get_badminton_forehand_clear()
         else:
             raise ValueError(f"不支持的运动动作组合: {sport} - {action}")
