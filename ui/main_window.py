@@ -204,6 +204,8 @@ class MainWindow(QWidget):
             self.compare_btn.setEnabled(False)
 
     def compare_videos(self):
+        # 禁用按钮，防止重复点击
+        self.compare_btn.setEnabled(False)
         # 根据当前引擎类型进行分析
         if self.current_engine == self.experimental_engine and hasattr(self.current_engine, 'compare'):
             # 使用实验引擎，传递运动和动作类型
@@ -215,7 +217,6 @@ class MainWindow(QWidget):
                 sport=sport, 
                 action=action
             )
-            
             # 如果启用了高级分析，使用高级分析窗口
             if self.experimental_checkbox.isChecked():
                 self.results_window = AdvancedAnalysisWindow(
@@ -234,8 +235,9 @@ class MainWindow(QWidget):
             # 使用基础引擎
             result = self.current_engine.compare(self.user_video_path, self.standard_video_path)
             self.results_window = ResultsWindow(result, self.user_video_path, self.standard_video_path)
-        
         self.results_window.show()
+        # 分析结束后重新启用按钮
+        self.compare_btn.setEnabled(True)
     
     def open_settings(self):
         """打开设置对话框"""
