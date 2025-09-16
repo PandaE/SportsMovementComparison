@@ -9,6 +9,7 @@ from typing import Dict, List, Tuple, Optional
 from .comparison_engine import ComparisonEngine
 from .experimental.frame_analyzer.frame_comparator import FrameComparator
 from .experimental.frame_analyzer.pose_extractor import PoseExtractor
+from .experimental.frame_analyzer.key_frame_extractor import KeyFrameExtractor
 from .experimental.config.sport_configs import SportConfigs
 
 
@@ -31,6 +32,7 @@ class ExperimentalComparisonEngine(ComparisonEngine):
             try:
                 self.pose_extractor = PoseExtractor(backend="mediapipe")
                 self.frame_comparator = FrameComparator(pose_extractor=self.pose_extractor)
+                self.key_frame_extractor = KeyFrameExtractor()
                 self.experimental_ready = True
                 print("实验模块初始化成功")
             except Exception as e:
@@ -66,34 +68,72 @@ class ExperimentalComparisonEngine(ComparisonEngine):
             # 1. 获取运动配置
             config = SportConfigs.get_config(sport, action)
             
-            # 2. 提取关键帧
-            user_frames = self._extract_key_frames(user_video_path)
-            standard_frames = self._extract_key_frames(standard_video_path)
+            # 2. 自动提取关键帧
+            print(f"🎯 开始提取关键帧: {sport} - {action}")
+            user_stage_frames = self.key_frame_extractor.extract_stage_images(user_video_path, sport, action)
+            standard_stage_frames = self.key_frame_extractor.extract_stage_images(standard_video_path, sport, action)
             
-            if not user_frames or not standard_frames:
-                return self._create_error_result("无法提取有效帧")
+            if not user_stage_frames or not standard_stage_frames:
+                return self._create_error_result("无法提取有效的关键帧")
             
-            # 3. 执行帧对比分析
+            print(f"✅ 关键帧提取完成，共提取 {len(user_stage_frames)} 个阶段的帧")
+            
+            # 3. 执行多阶段对比分析
             results = []
             overall_score = 0.0
             
             for stage in config.stages:
-                stage_result = self._analyze_stage(user_frames[0], standard_frames[0], stage)
-                results.append(stage_result)
-                overall_score += stage_result['score'] * stage.weight
+                stage_name = stage.name
+                
+                # 检查是否有对应的关键帧
+                if stage_name in user_stage_frames and stage_name in standard_stage_frames:
+                    stage_result = self._analyze_stage(
+                        user_stage_frames[stage_name], 
+                        standard_stage_frames[stage_name], 
+                        stage
+                    )
+                    results.append(stage_result)
+                    overall_score += stage_result['score'] * stage.weight
+                    print(f"   📊 {stage_name}: {stage_result['score']:.2f} (权重: {stage.weight})")
+                else:
+                    print(f"   ⚠️  {stage_name}: 缺少关键帧，跳过分析")
             
-            # 4. 生成对比可视化
-            comparison_images = self._generate_comparison_images(
-                user_frames[0], standard_frames[0], results
+            # 4. 生成对比可视化 (使用第一个可用的关键帧对)
+            comparison_images = {}
+            if user_stage_frames and standard_stage_frames:
+                first_stage = list(user_stage_frames.keys())[0]
+                comparison_images = self._generate_comparison_images(
+                    user_stage_frames[first_stage], 
+                    standard_stage_frames[first_stage], 
+                    results
+                )
+            
+            # 5. 构建兼容的返回格式，包含关键帧信息
+            # 获取关键帧位置信息用于传递
+            user_frame_positions = self.key_frame_extractor.extract_stage_frames(user_video_path, sport, action)
+            standard_frame_positions = self.key_frame_extractor.extract_stage_frames(standard_video_path, sport, action)
+            
+            result = self._format_experimental_results(
+                overall_score, results, comparison_images, user_video_path, standard_video_path,
+                user_frame_positions, standard_frame_positions
             )
             
-            # 5. 构建兼容的返回格式
-            return self._format_experimental_results(
-                overall_score, results, comparison_images, user_video_path, standard_video_path
-            )
+            # 6. 添加关键帧信息到结果中
+            result['key_frame_info'] = {
+                'user_frames': user_frame_positions,
+                'standard_frames': standard_frame_positions,
+                'extraction_method': 'intelligent' if self.key_frame_extractor.use_intelligent_extraction else 'time_based',
+                'sport': sport,
+                'action': action
+            }
+            
+            print(f"🏆 分析完成，总分: {overall_score:.2f}")
+            return result
             
         except Exception as e:
             print(f"实验分析失败: {e}")
+            import traceback
+            traceback.print_exc()
             return self._create_error_result(f"分析失败: {str(e)}")
     
     def _extract_key_frames(self, video_path: str, num_frames: int = 1) -> List:
@@ -349,7 +389,8 @@ class ExperimentalComparisonEngine(ComparisonEngine):
     
     def _format_experimental_results(self, overall_score: float, stage_results: List, 
                                    comparison_images: Dict, user_video_path: str, 
-                                   standard_video_path: str) -> Dict:
+                                   standard_video_path: str, user_frame_positions: Dict[str, int] = None,
+                                   standard_frame_positions: Dict[str, int] = None) -> Dict:
         """格式化结果以兼容原有接口并提供高级分析数据"""
         
         # 构建key_movements列表（兼容原接口）
@@ -409,11 +450,9 @@ class ExperimentalComparisonEngine(ComparisonEngine):
                     'measurement_points': keypoints
                 })
             
-            # 为高级分析窗口构建阶段数据
-            # 估算关键帧位置（可以根据实际分析结果调整）
-            frame_offset = i * 30  # 假设每个阶段间隔30帧
-            user_frame = 30 + frame_offset
-            standard_frame = 25 + frame_offset
+            # 为高级分析窗口构建阶段数据，使用传入的关键帧位置
+            user_frame = user_frame_positions.get(stage_name, 0) if user_frame_positions else 0
+            standard_frame = standard_frame_positions.get(stage_name, 0) if standard_frame_positions else 0
             
             stages_data[stage_name] = {
                 'user_frame': user_frame,
@@ -440,16 +479,17 @@ class ExperimentalComparisonEngine(ComparisonEngine):
             'score': int(overall_score * 100),  # 转换为百分制
             'detailed_score': overall_score,
             'key_movements': key_movements,
-            'analysis_type': 'experimental',
+            'analysis_type': 'experimental_with_key_frames',
             'sport': '羽毛球',
             'action': '正手高远球',
             'user_video_path': user_video_path,
             'standard_video_path': standard_video_path,
             'comparison_info': {
-                'user_frame': f"从 {user_video_path} 提取的关键帧",
-                'standard_frame': f"从 {standard_video_path} 提取的关键帧",
+                'user_frame': f"从 {user_video_path} 自动提取的关键帧",
+                'standard_frame': f"从 {standard_video_path} 自动提取的关键帧",
                 'rules_applied': [m.get('measurement_name') for sr in stage_results for m in sr.get('measurements', [])],
-                'total_comparisons': sum(len(sr.get('measurements', [])) for sr in stage_results)
+                'total_comparisons': sum(len(sr.get('measurements', [])) for sr in stage_results),
+                'extraction_method': '基于时间等分的自动关键帧提取'
             },
             # 为高级分析窗口添加阶段数据
             'stages': stages_data,
@@ -457,7 +497,8 @@ class ExperimentalComparisonEngine(ComparisonEngine):
             'analysis_summary': {
                 'total_stages': len(stage_results),
                 'avg_score': overall_score * 100,
-                'suggestions': [s for sr in stage_results for s in sr.get('suggestions', [])]
+                'suggestions': [s for sr in stage_results for s in sr.get('suggestions', [])],
+                'key_frame_extraction': '✅ 已自动提取关键帧'
             }
         }
     

@@ -43,6 +43,45 @@ class SportConfigs:
     def get_badminton_forehand_clear() -> ActionConfig:
         """羽毛球正手高远球配置"""
         
+        # 引拍阶段结束的测量规则
+        backswing_measurements = [
+            MeasurementRule(
+                name="肘部高度",
+                description="右肘相对于右肩的垂直高度差",
+                measurement_type="vertical_distance",
+                keypoints=["right_elbow"],
+                unit="像素",
+                tolerance_range=(-50, 50),  # 允许肘部在肩部上下50像素范围内
+                weight=1.0,
+                reference_point="right_shoulder",
+                direction="up"
+            ),
+            MeasurementRule(
+                name="手腕后摆",
+                description="手腕相对于肘部的水平后摆距离",
+                measurement_type="horizontal_distance", 
+                keypoints=["right_wrist"],
+                unit="像素",
+                tolerance_range=(30, 120),  # 手腕应该后摆30-120像素
+                weight=1.0,
+                reference_point="right_elbow",
+                direction="back"
+            )
+        ]
+        
+        # 发力阶段结束的测量规则
+        power_measurements = [
+            MeasurementRule(
+                name="击球时手臂舒展度",
+                description="击球瞬间大臂到手腕的伸展角度，反映发力充分程度",
+                measurement_type="angle",
+                keypoints=["right_shoulder", "right_elbow", "right_wrist"],
+                unit="度",
+                tolerance_range=(140, 180),  # 手臂应该相对伸直，140-180度
+                weight=1.0
+            )
+        ]
+        
         # 架拍阶段结束的测量规则
         setup_measurements = [
             MeasurementRule(
@@ -64,7 +103,19 @@ class SportConfigs:
                     name="架拍阶段结束",
                     description="准备击球的架拍姿势",
                     measurements=setup_measurements,
-                    weight=1.0  # 目前只有一个阶段，权重为1
+                    weight=0.3  # 架拍阶段权重30%
+                ),
+                StageConfig(
+                    name="引拍阶段结束",
+                    description="拍子向后引拍到位的姿势",
+                    measurements=backswing_measurements,
+                    weight=0.2  # 引拍阶段权重20%
+                ),
+                StageConfig(
+                    name="发力阶段结束",
+                    description="击球瞬间的发力姿势",
+                    measurements=power_measurements,
+                    weight=0.5  # 发力阶段权重50%，最重要的击球瞬间
                 )
             ]
         )
