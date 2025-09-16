@@ -174,6 +174,14 @@ class SettingsDialog(QDialog):
         self.update_tab_labels()
 
     def update_tab_labels(self):
+        # 基本设置tab
+        try:
+            basic_tab = self.tab_widget.widget(0)
+            form_layout = basic_tab.findChild(QFormLayout)
+            if form_layout:
+                form_layout.labelForField(self.language_combo).setText(self.tr_text('language_label'))
+        except Exception:
+            pass
         # 分析设置tab
         try:
             exp_group = self.tab_widget.widget(1).findChild(QGroupBox)
@@ -183,6 +191,18 @@ class SettingsDialog(QDialog):
             if measure_group:
                 measure_group.setTitle(self.tr_text('measure_group'))
             self.experimental_checkbox.setText(self.tr_text('experimental'))
+            # 更新“姿态检测后端”标签
+            exp_layout = exp_group.layout()
+            if exp_layout:
+                label = exp_layout.labelForField(self.pose_backend_combo)
+                if label:
+                    label.setText(self.tr_text('pose_backend'))
+            # 更新“角度容差”标签
+            measure_layout = measure_group.layout()
+            if measure_layout:
+                label = measure_layout.labelForField(self.angle_layout)
+                if label:
+                    label.setText(self.tr_text('angle_tolerance'))
             self.pose_backend_combo.setItemText(0, 'mediapipe')
             self.pose_backend_combo.setItemText(1, 'mock')
             self.angle_tolerance_label.setText(f"{self.angle_tolerance_slider.value():.1f}°")
@@ -196,6 +216,20 @@ class SettingsDialog(QDialog):
             image_group = self.tab_widget.widget(2).findChildren(QGroupBox)[1]
             if image_group:
                 image_group.setTitle(self.tr_text('image_group'))
+            # 更新“提取方法”标签
+            frame_layout = frame_group.layout()
+            if frame_layout:
+                label = frame_layout.labelForField(self.extraction_method_combo)
+                if label:
+                    label.setText(self.tr_text('frame_extraction'))
+                label2 = frame_layout.labelForField(self.max_frames_spinbox)
+                if label2:
+                    label2.setText(self.tr_text('max_frames'))
+            image_layout = image_group.layout()
+            if image_layout:
+                label3 = image_layout.labelForField(self.quality_layout)
+                if label3:
+                    label3.setText(self.tr_text('quality_threshold'))
             self.extraction_method_combo.setItemText(0, 'uniform')
             self.extraction_method_combo.setItemText(1, 'middle')
             self.extraction_method_combo.setItemText(2, 'motion_based')
@@ -213,6 +247,25 @@ class SettingsDialog(QDialog):
             info_group = self.tab_widget.widget(3).findChildren(QGroupBox)[1]
             if info_group:
                 info_group.setTitle(self.tr_text('system_info'))
+                info_layout = info_group.layout()
+                if info_layout:
+                    info_text = info_group.findChild(QTextEdit)
+                    if info_text:
+                        try:
+                            import cv2
+                            opencv_version = cv2.__version__
+                        except:
+                            opencv_version = "未安装" if self.settings['language'] == 'zh' else "Not Installed"
+                        try:
+                            import mediapipe
+                            mediapipe_version = mediapipe.__version__
+                        except:
+                            mediapipe_version = "未安装" if self.settings['language'] == 'zh' else "Not Installed"
+                        if self.settings['language'] == 'zh':
+                            info_content = f"""OpenCV 版本: {opencv_version}\nMediaPipe 版本: {mediapipe_version}\n实验模块状态: 可用\n支持的运动: 羽毛球\n支持的动作: 正手高远球"""
+                        else:
+                            info_content = f"""OpenCV Version: {opencv_version}\nMediaPipe Version: {mediapipe_version}\nExperimental Module: Available\nSupported Sports: Badminton\nSupported Actions: Forehand Clear"""
+                        info_text.setText(info_content)
         except Exception:
             pass
     
@@ -250,10 +303,10 @@ class SettingsDialog(QDialog):
             lambda v: self.angle_tolerance_label.setText(f"{v:.1f}°")
         )
         
-        angle_layout = QHBoxLayout()
-        angle_layout.addWidget(self.angle_tolerance_slider)
-        angle_layout.addWidget(self.angle_tolerance_label)
-        measure_layout.addRow("角度容差:", angle_layout)
+        self.angle_layout = QHBoxLayout()
+        self.angle_layout.addWidget(self.angle_tolerance_slider)
+        self.angle_layout.addWidget(self.angle_tolerance_label)
+        measure_layout.addRow("角度容差:", self.angle_layout)
         
         measure_group.setLayout(measure_layout)
         layout.addWidget(measure_group)
@@ -306,10 +359,10 @@ class SettingsDialog(QDialog):
             lambda v: self.quality_threshold_label.setText(f"{v/100:.2f}")
         )
         
-        quality_layout = QHBoxLayout()
-        quality_layout.addWidget(self.quality_threshold_slider)
-        quality_layout.addWidget(self.quality_threshold_label)
-        image_layout.addRow("质量阈值:", quality_layout)
+        self.quality_layout = QHBoxLayout()
+        self.quality_layout.addWidget(self.quality_threshold_slider)
+        self.quality_layout.addWidget(self.quality_threshold_label)
+        image_layout.addRow("质量阈值:", self.quality_layout)
         
         image_group.setLayout(image_layout)
         layout.addWidget(image_group)
@@ -391,7 +444,6 @@ MediaPipe 版本: {mediapipe_version}
         # 更新界面控件
         self.experimental_checkbox.setChecked(self.settings['experimental_enabled'])
         self.pose_backend_combo.setCurrentText(self.settings['pose_backend'])
-        self.extraction_method_combo.setCurrentText(self.settings['frame_extraction_method'])
         self.max_frames_spinbox.setValue(self.settings['max_frames_per_video'])
         self.quality_threshold_slider.setValue(int(self.settings['quality_threshold'] * 100))
         self.angle_tolerance_slider.setValue(int(self.settings['angle_tolerance']))
