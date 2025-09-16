@@ -419,12 +419,20 @@ class AdvancedAnalysisWindow(QMainWindow):
         try:
             if self.user_video_path:
                 self.user_video_player.set_video(self.user_video_path)
+                # 设置用户视频的火柴人颜色为红色
+                self.user_video_player.set_pose_color((255, 0, 0))  # RGB红色
+                # 默认启用姿态显示
+                self.user_video_player.set_pose_display(True)
         except Exception as e:
             print(f"加载用户视频失败: {e}")
         
         try:
             if self.standard_video_path:
                 self.standard_video_player.set_video(self.standard_video_path)
+                # 设置标准视频的火柴人颜色为绿色
+                self.standard_video_player.set_pose_color((0, 255, 0))  # RGB绿色
+                # 默认启用姿态显示
+                self.standard_video_player.set_pose_display(True)
         except Exception as e:
             print(f"加载标准视频失败: {e}")
         

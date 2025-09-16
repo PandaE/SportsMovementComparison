@@ -4,6 +4,7 @@ Image processing utilities.
 import cv2
 import numpy as np
 from typing import Tuple, Optional
+from ..experimental.models.pose_data import BodyPose, PoseKeypoint
 
 
 class ImageUtils:
@@ -128,3 +129,192 @@ class ImageUtils:
         cv2.putText(result, text, position, cv2.FONT_HERSHEY_SIMPLEX, 
                    font_scale, color, thickness)
         return result
+    
+    @staticmethod
+    def draw_stick_figure(image: np.ndarray, pose: BodyPose, 
+                         color: Tuple[int, int, int] = (0, 255, 0),
+                         thickness: int = 2,
+                         point_radius: int = 4,
+                         confidence_threshold: float = 0.5) -> np.ndarray:
+        """
+        在图像上绘制火柴人姿态
+        
+        Args:
+            image: 输入图像
+            pose: 姿态数据
+            color: 绘制颜色 (B, G, R)
+            thickness: 线条粗细
+            point_radius: 关键点半径
+            confidence_threshold: 置信度阈值，低于此值的点不绘制
+            
+        Returns:
+            绘制火柴人后的图像
+        """
+        if not pose:
+            return image
+        
+        result = image.copy()
+        
+        # 定义骨骼连接
+        connections = [
+            # 头部到躯干
+            ('nose', 'left_shoulder'),
+            ('nose', 'right_shoulder'),
+            
+            # 躯干
+            ('left_shoulder', 'right_shoulder'),
+            ('left_shoulder', 'left_hip'),
+            ('right_shoulder', 'right_hip'),
+            ('left_hip', 'right_hip'),
+            
+            # 左臂
+            ('left_shoulder', 'left_elbow'),
+            ('left_elbow', 'left_wrist'),
+            
+            # 右臂
+            ('right_shoulder', 'right_elbow'),
+            ('right_elbow', 'right_wrist'),
+            
+            # 左腿
+            ('left_hip', 'left_knee'),
+            ('left_knee', 'left_ankle'),
+            
+            # 右腿
+            ('right_hip', 'right_knee'),
+            ('right_knee', 'right_ankle')
+        ]
+        
+        # 绘制连接线
+        for start_name, end_name in connections:
+            start_point = pose.get_keypoint(start_name)
+            end_point = pose.get_keypoint(end_name)
+            
+            if (start_point and end_point and 
+                start_point.confidence >= confidence_threshold and 
+                end_point.confidence >= confidence_threshold):
+                
+                start_pos = (int(start_point.x), int(start_point.y))
+                end_pos = (int(end_point.x), int(end_point.y))
+                
+                cv2.line(result, start_pos, end_pos, color, thickness)
+        
+        # 绘制关键点
+        keypoints = [
+            ('nose', pose.nose),
+            ('left_shoulder', pose.left_shoulder),
+            ('right_shoulder', pose.right_shoulder),
+            ('left_elbow', pose.left_elbow),
+            ('right_elbow', pose.right_elbow),
+            ('left_wrist', pose.left_wrist),
+            ('right_wrist', pose.right_wrist),
+            ('left_hip', pose.left_hip),
+            ('right_hip', pose.right_hip),
+            ('left_knee', pose.left_knee),
+            ('right_knee', pose.right_knee),
+            ('left_ankle', pose.left_ankle),
+            ('right_ankle', pose.right_ankle)
+        ]
+        
+        for name, keypoint in keypoints:
+            if keypoint and keypoint.confidence >= confidence_threshold:
+                pos = (int(keypoint.x), int(keypoint.y))
+                cv2.circle(result, pos, point_radius, color, -1)
+                
+                # 可选：添加关键点标签（调试用）
+                # cv2.putText(result, name[:4], (pos[0], pos[1]-10), 
+                #            cv2.FONT_HERSHEY_SIMPLEX, 0.3, color, 1)
+        
+        return result
+    
+    @staticmethod
+    def create_pose_preview_image(image: np.ndarray, pose: BodyPose = None,
+                                 title: str = "", 
+                                 target_size: Tuple[int, int] = (200, 150)) -> np.ndarray:
+        """
+        创建带有姿态预览的缩略图
+        
+        Args:
+            image: 原始图像
+            pose: 姿态数据（可选）
+            title: 图像标题
+            target_size: 目标尺寸
+            
+        Returns:
+            带有火柴人的预览图像
+        """
+        # 调整图像尺寸
+        preview_img = ImageUtils.resize_image(image, target_size, keep_aspect_ratio=True)
+        
+        # 如果有姿态数据，绘制火柴人
+        if pose:
+            # 计算缩放比例以适配调整后的图像
+            h_orig, w_orig = image.shape[:2]
+            h_new, w_new = preview_img.shape[:2]
+            
+            # 创建缩放后的姿态副本
+            scaled_pose = ImageUtils._scale_pose(pose, w_orig, h_orig, w_new, h_new)
+            preview_img = ImageUtils.draw_stick_figure(preview_img, scaled_pose, 
+                                                      color=(0, 255, 0), thickness=2)
+        
+        # 添加标题
+        if title:
+            preview_img = ImageUtils.add_text_overlay(preview_img, title, 
+                                                     position=(5, 15), 
+                                                     font_scale=0.4, 
+                                                     color=(255, 255, 255))
+        
+        return preview_img
+    
+    @staticmethod
+    def _scale_pose(pose: BodyPose, orig_w: int, orig_h: int, 
+                   new_w: int, new_h: int) -> BodyPose:
+        """
+        缩放姿态数据以适配新的图像尺寸
+        
+        Args:
+            pose: 原始姿态
+            orig_w, orig_h: 原始图像尺寸
+            new_w, new_h: 新图像尺寸
+            
+        Returns:
+            缩放后的姿态
+        """
+        if not pose:
+            return pose
+        
+        # 计算实际的缩放和偏移
+        scale = min(new_w / orig_w, new_h / orig_h)
+        scaled_w, scaled_h = int(orig_w * scale), int(orig_h * scale)
+        x_offset = (new_w - scaled_w) // 2
+        y_offset = (new_h - scaled_h) // 2
+        
+        def scale_keypoint(kp: PoseKeypoint) -> PoseKeypoint:
+            if not kp:
+                return kp
+            return PoseKeypoint(
+                x=kp.x * scale + x_offset,
+                y=kp.y * scale + y_offset,
+                z=kp.z,
+                confidence=kp.confidence
+            )
+        
+        # 创建缩放后的姿态
+        from ..experimental.models.pose_data import BodyPose
+        scaled_pose = BodyPose(
+            nose=scale_keypoint(pose.nose),
+            left_shoulder=scale_keypoint(pose.left_shoulder),
+            right_shoulder=scale_keypoint(pose.right_shoulder),
+            left_elbow=scale_keypoint(pose.left_elbow),
+            right_elbow=scale_keypoint(pose.right_elbow),
+            left_wrist=scale_keypoint(pose.left_wrist),
+            right_wrist=scale_keypoint(pose.right_wrist),
+            left_hip=scale_keypoint(pose.left_hip),
+            right_hip=scale_keypoint(pose.right_hip),
+            left_knee=scale_keypoint(pose.left_knee),
+            right_knee=scale_keypoint(pose.right_knee),
+            left_ankle=scale_keypoint(pose.left_ankle),
+            right_ankle=scale_keypoint(pose.right_ankle),
+            frame_index=pose.frame_index
+        )
+        
+        return scaled_pose
