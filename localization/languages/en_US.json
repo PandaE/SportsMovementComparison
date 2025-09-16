@@ -1,0 +1,189 @@
+{
+  "ui": {
+    "main_window": {
+      "title": "Sports Movement Comparator",
+      "settings": "Settings",
+      "analysis_group": "Analysis Settings",
+      "experimental_mode": "Enable Advanced Pose Analysis (Experimental)",
+      "sport_label": "Sport:",
+      "action_label": "Action:",
+      "import_user": "Import User Video",
+      "import_standard": "Import Standard Video",
+      "compare": "Start Comparison",
+      "compare_advanced": "Start Advanced Comparison",
+      "compare_basic": "Start Basic Comparison"
+    },
+    "settings": {
+      "title": "Settings",
+      "language": "Language:",
+      "language_chinese": "简体中文",
+      "language_english": "English",
+      "ok": "OK",
+      "cancel": "Cancel",
+      "apply": "Apply",
+      "reset": "Reset to Default",
+      "basic_tab": "Basic",
+      "analysis_tab": "Analysis",
+      "advanced_tab": "Advanced",
+      "exp_group": "Experimental Features",
+      "experimental": "Enable Advanced Pose Analysis",
+      "pose_backend": "Pose Backend:",
+      "measure_group": "Measurement Settings",
+      "angle_tolerance": "Angle Tolerance:",
+      "output_settings": "Output Settings",
+      "save_images": "Save Analysis Images",
+      "system_info": "System Information",
+      "exp_status": "Experimental Module Status",
+      "not_installed": "Not Installed"
+    },
+    "video_player": {
+      "play": "Play",
+      "pause": "Pause",
+      "stop": "Stop",
+      "speed": "Speed",
+      "frame": "Frame",
+      "import_tip": "Click to import video file",
+      "prev_tip": "Previous Frame",
+      "next_tip": "Next Frame",
+      "play_tip": "Play/Pause",
+      "pause_tip": "Pause",
+      "show_pose": "Show Pose",
+      "select_video": "Select Video File",
+      "frame_info": "Frame: {current} / {total}",
+      "time_info": "Time: {current_min:02d}:{current_sec:02d} / {total_min:02d}:{total_sec:02d}"
+    },
+    "analysis": {
+      "title": "Advanced Analysis - Movement Comparison",
+      "video_preview": "🎬 Video Preview",
+      "user_video": "User Video",
+      "standard_video": "Standard Video",
+      "stage_analysis": "📈 Stage Analysis",
+      "compare_group": "Key Frame Comparison",
+      "result_group": "Comparison Results",
+      "frame": "Frame:",
+      "update": "Update",
+      "loading": "Loading...",
+      "no_data": "No comparison data",
+      "score": "📈 Stage Score",
+      "status": "📊 Analysis",
+      "measurements": "📏 Measurements:",
+      "user": "User",
+      "standard": "Standard",
+      "no_detail": "No detailed comparison",
+      "unknown_rule": "Unknown Rule",
+      "show_fail": "Display failed",
+      "stage_setup": "Setup Stage",
+      "stage_backswing": "Backswing Stage",
+      "stage_power": "Power Stage",
+      "stage_impact": "Impact Stage",
+      "stage_follow_through": "Follow Through",
+      "stage_unknown": "Unknown Stage"
+    },
+    "results": {
+      "title": "Analysis Results",
+      "score": "Score",
+      "detailed_score": "Detailed Score",
+      "video_tab": "Video Comparison",
+      "analysis_tab": "Action Analysis",
+      "detailed_tab": "Detailed Measurements",
+      "pose_tab": "Pose Visualization",
+      "user_video": "User Video",
+      "standard_video": "Standard Video",
+      "key_analysis": "Key Action Analysis:",
+      "detailed_measurements": "Detailed Measurements:",
+      "pose_visualization": "Pose Visualization:",
+      "no_pose_image": "No pose visualization image",
+      "user_pose": "User Pose",
+      "standard_pose": "Standard Pose",
+      "analysis_result": "Analysis Result",
+      "suggestion": "Suggestion",
+      "comparison_report": "Comparison Analysis Report",
+      "sport_type": "Sport Type",
+      "action_type": "Action Type",
+      "analysis_type": "Analysis Type",
+      "advanced_analysis": "Advanced Pose Analysis",
+      "basic_analysis": "Basic Analysis",
+      "comparison_data": "Comparison Data",
+      "user_frame": "User Frame",
+      "standard_frame": "Standard Frame",
+      "rules_applied": "Rules Applied",
+      "total_comparisons": "Total Comparisons",
+      "overall_score": "Overall Score",
+      "stage": "Stage",
+      "stage_score": "Stage Score",
+      "error_info": "Error Information",
+      "unknown": "Unknown"
+    },
+    "dialogs": {
+      "select_video": "Select Video File",
+      "video_files": "Video Files (*.mp4 *.avi *.mov)",
+      "error": "Error",
+      "info": "Information",
+      "warning": "Warning",
+      "question": "Confirm"
+    },
+    "common": {
+      "ok": "OK",
+      "cancel": "Cancel",
+      "apply": "Apply",
+      "close": "Close",
+      "save": "Save",
+      "load": "Load",
+      "available": "Available",
+      "not_available": "Not Available"
+    }
+  },
+  "analysis": {
+    "sports": {
+      "badminton": "Badminton",
+      "supported": "Supported Sports"
+    },
+    "actions": {
+      "clear_shot": "Clear Shot (High Long Shot)",
+      "forehand_clear": "Forehand Clear",
+      "supported": "Supported Actions"
+    },
+    "stages": {
+      "setup_stage": "Setup Stage",
+      "backswing_stage": "Backswing Stage",
+      "power_stage": "Power Stage",
+      "setup_description": "Preparation posture for hitting",
+      "backswing_description": "Racket backswing position",
+      "power_description": "Power generation at impact moment"
+    },
+    "measurements": {
+      "arm_angle": "Upper Arm-Forearm Angle",
+      "elbow_height": "Elbow Height",
+      "wrist_backswing": "Wrist Backswing",
+      "arm_extension": "Arm Extension at Impact"
+    },
+    "results": {
+      "score": "Score: {score}",
+      "excellent": "Excellent",
+      "good": "Good",
+      "needs_improvement": "Needs Improvement",
+      "poor": "Poor"
+    }
+  },
+  "messages": {
+    "errors": {
+      "file_not_found": "File not found",
+      "invalid_video": "Invalid video file",
+      "analysis_failed": "Analysis failed",
+      "no_pose_detected": "No pose detected",
+      "not_installed": "Not Installed"
+    },
+    "info": {
+      "analysis_starting": "Starting analysis...",
+      "analysis_complete": "Analysis completed",
+      "video_loaded": "Video loaded successfully",
+      "language_changed": "Language changed to English"
+    },
+    "suggestions": {
+      "keep_good_work": "Good technique, keep it up!",
+      "adjust_arm_angle": "Arm angle deviation detected, adjust posture",
+      "improve_posture": "Pay attention to body posture",
+      "practice_more": "More practice needed"
+    }
+  }
+}
