@@ -132,7 +132,7 @@ class PoseExtractor:
         
         return mock_pose
     
-    def visualize_pose(self, image: np.ndarray, pose: BodyPose) -> np.ndarray:
+    def visualize_pose(self, image: np.ndarray, pose: BodyPose, color: tuple = (0, 255, 0)) -> np.ndarray:
         """在图像上可视化姿态"""
         vis_image = image.copy()
         
@@ -156,7 +156,7 @@ class PoseExtractor:
         # 绘制点
         for name, keypoint in keypoints:
             if keypoint:
-                cv2.circle(vis_image, (int(keypoint.x), int(keypoint.y)), 5, (0, 255, 0), -1)
+                cv2.circle(vis_image, (int(keypoint.x), int(keypoint.y)), 5, color, -1)
                 cv2.putText(vis_image, name[:4], (int(keypoint.x), int(keypoint.y-10)), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 255, 255), 1)
         
@@ -179,6 +179,6 @@ class PoseExtractor:
         for pt1, pt2 in connections:
             if pt1 and pt2:
                 cv2.line(vis_image, (int(pt1.x), int(pt1.y)), (int(pt2.x), int(pt2.y)), 
-                        (255, 0, 0), 2)
+                        color, 2)
         
         return vis_image

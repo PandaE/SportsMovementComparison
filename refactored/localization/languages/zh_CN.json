@@ -1,0 +1,190 @@
+{
+  "ui": {
+    "main_window": {
+      "title": "运动动作对比分析系统",
+      "settings": "设置",
+      "analysis_group": "分析设置",
+      "experimental_mode": "启用高级姿态分析 (实验功能)",
+      "sport_label": "运动类型:",
+      "action_label": "动作类型:",
+      "import_user": "导入用户视频",
+      "import_standard": "导入标准视频",
+      "compare": "开始分析对比",
+      "compare_advanced": "开始高级分析对比",
+      "compare_basic": "开始基础对比"
+    },
+    "settings": {
+      "title": "设置",
+      "language": "语言:",
+      "language_chinese": "简体中文",
+      "language_english": "English",
+      "ok": "确定",
+      "cancel": "取消",
+      "apply": "应用",
+      "reset": "重置为默认",
+      "basic_tab": "基本设置",
+      "analysis_tab": "分析设置",
+      "advanced_tab": "高级设置",
+      "exp_group": "实验功能",
+      "experimental": "启用高级姿态分析",
+      "pose_backend": "姿态检测后端:",
+      "measure_group": "测量设置",
+      "angle_tolerance": "角度容差:",
+      "output_settings": "输出设置",
+      "save_images": "保存分析图像",
+      "system_info": "系统信息",
+      "exp_status": "实验模块状态",
+      "not_installed": "未安装"
+    },
+    "video_player": {
+      "play": "播放",
+      "pause": "暂停",
+      "stop": "停止",
+      "speed": "速度",
+      "frame": "帧数",
+      "import_tip": "点击导入视频文件",
+      "prev_tip": "上一帧",
+      "next_tip": "下一帧",
+      "play_tip": "播放/暂停",
+      "pause_tip": "暂停",
+      "show_pose": "显示姿态",
+      "select_video": "选择视频文件",
+      "frame_info": "帧: {current} / {total}",
+      "time_info": "时间: {current_min:02d}:{current_sec:02d} / {total_min:02d}:{total_sec:02d}"
+    },
+    "analysis": {
+      "title": "高级分析结果 - 动作对比分析",
+      "video_preview": "🎬 视频预览区域",
+      "user_video": "用户视频",
+      "standard_video": "标准视频",
+      "stage_analysis": "📈 阶段分析区域",
+      "compare_group": "关键帧对比",
+      "result_group": "对比分析结果",
+      "frame": "帧数:",
+      "update": "更新",
+      "loading": "加载中...",
+      "no_data": "暂无对比数据",
+      "score": "📈 阶段得分",
+      "status": "📊 分析结果",
+      "measurements": "📏 测量对比:",
+      "user": "用户",
+      "standard": "标准",
+      "no_detail": "暂无详细对比数据",
+      "unknown_rule": "未知规则",
+      "show_fail": "显示失败",
+      "stage_setup": "架拍阶段结束",
+      "stage_backswing": "引拍阶段结束",
+      "stage_power": "发力阶段结束",
+      "stage_impact": "击球瞬间",
+      "stage_follow_through": "随挥完成",
+      "stage_unknown": "未知阶段"
+    },
+    "results": {
+      "title": "动作分析结果",
+      "score": "综合得分",
+      "detailed_score": "详细得分",
+      "video_tab": "视频对比",
+      "analysis_tab": "动作分析",
+      "detailed_tab": "详细测量",
+      "pose_tab": "姿态可视化",
+      "user_video": "用户视频",
+      "standard_video": "标准视频",
+      "key_analysis": "关键动作分析:",
+      "detailed_measurements": "详细测量数据:",
+      "pose_visualization": "姿态对比可视化:",
+      "no_pose_image": "暂无姿态可视化图像",
+      "user_pose": "用户姿态",
+      "standard_pose": "标准姿态",
+      "analysis_result": "分析结果",
+      "suggestion": "改进建议",
+      "comparison_report": "对比分析报告",
+      "sport_type": "运动类型",
+      "action_type": "动作类型",
+      "analysis_type": "分析类型",
+      "advanced_analysis": "高级姿态分析",
+      "basic_analysis": "基础分析",
+      "comparison_data": "对比数据源",
+      "user_frame": "用户帧",
+      "standard_frame": "标准帧",
+      "rules_applied": "应用规则",
+      "total_comparisons": "对比项目数",
+      "overall_score": "综合得分",
+      "stage": "阶段",
+      "stage_score": "阶段得分",
+      "error_info": "错误信息",
+      "unknown": "未知"
+    },
+    "dialogs": {
+      "select_video": "选择视频文件",
+      "video_files": "视频文件 (*.mp4 *.avi *.mov)",
+      "error": "错误",
+      "info": "信息",
+      "warning": "警告",
+      "question": "确认"
+    },
+    "common": {
+      "ok": "确定",
+      "cancel": "取消",
+      "apply": "应用",
+      "close": "关闭",
+      "save": "保存",
+      "load": "加载",
+      "available": "可用",
+      "not_available": "不可用"
+    }
+  },
+  "analysis": {
+    "sports": {
+      "badminton": "羽毛球",
+      "supported": "支持的运动"
+    },
+    "actions": {
+      "clear_shot": "正手高远球",
+      "forehand_clear": "正手高远球",
+      "supported": "支持的动作"
+    },
+    "stages": {
+      "setup_stage": "架拍阶段",
+      "backswing_stage": "引拍阶段", 
+      "power_stage": "击球阶段",
+      "setup_description": "准备击球的架拍姿势",
+      "backswing_description": "拍子向后引拍到位的姿势",
+      "power_description": "击球瞬间的发力姿势"
+    },
+    "measurements": {
+      "arm_angle": "大臂小臂夹角",
+      "elbow_height": "肘部高度",
+      "wrist_backswing": "手腕后摆",
+      "arm_extension": "击球时手臂舒展度"
+    },
+    "results": {
+      "score": "得分: {score}分",
+      "excellent": "优秀",
+      "good": "良好",
+      "needs_improvement": "需要改进",
+      "poor": "较差"
+    }
+  },
+  "messages": {
+    "errors": {
+      "file_not_found": "文件未找到",
+      "invalid_video": "无效的视频文件",
+      "analysis_failed": "分析失败",
+      "no_pose_detected": "未检测到姿态",
+      "not_installed": "未安装",
+      "cannot_read_frame": "无法读取第 {frame} 帧"
+    },
+    "info": {
+      "analysis_starting": "开始分析...",
+      "analysis_complete": "分析完成",
+      "video_loaded": "视频加载完成",
+      "language_changed": "语言已切换为中文"
+    },
+    "suggestions": {
+      "keep_good_work": "动作标准，继续保持！",
+      "adjust_arm_angle": "角度偏差较大，注意调整手臂姿势",
+      "improve_posture": "注意身体姿态",
+      "practice_more": "需要更多练习"
+    }
+  }
+}

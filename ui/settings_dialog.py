@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (
     QSlider, QLineEdit, QTextEdit, QTabWidget, QWidget
 )
 from PyQt5.QtCore import Qt, pyqtSignal
+from localization import I18nManager, TK
 
 
 class SettingsDialog(QDialog):
@@ -17,7 +18,11 @@ class SettingsDialog(QDialog):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("应用设置")
+        
+        # 初始化国际化管理器
+        self.i18n = I18nManager.instance()
+        self.i18n.register_observer(self._on_language_changed)
+        
         self.setFixedSize(500, 400)
 
         # 默认设置
@@ -31,110 +36,39 @@ class SettingsDialog(QDialog):
             'enable_frame_enhancement': True,
             'save_analysis_images': True,
             'auto_select_best_frames': True,
-            'language': 'zh'  # 新增语言设置
-        }
-
-        # 文本映射（中英文）
-        self.translations = {
-            'zh': {
-                'title': '应用设置',
-                'basic_tab': '基本设置',
-                'language_label': '显示语言:',
-                'analysis_tab': '分析设置',
-                'video_tab': '视频处理',
-                'advanced_tab': '高级设置',
-                'ok': '确定',
-                'cancel': '取消',
-                'reset': '重置为默认',
-                'experimental': '启用高级姿态分析',
-                'pose_backend': '姿态检测后端:',
-                'angle_tolerance': '角度容差:',
-                'frame_extraction': '提取方法:',
-                'max_frames': '每视频最大帧数:',
-                'auto_select': '自动选择最佳质量帧',
-                'enhancement': '启用帧质量增强',
-                'quality_threshold': '质量阈值:',
-                'save_images': '保存分析图像',
-                'output_settings': '输出设置',
-                'system_info': '系统信息',
-                'exp_group': '实验功能',
-                'measure_group': '测量设置',
-                'frame_group': '帧提取设置',
-                'image_group': '图像处理',
-            },
-            'en': {
-                'title': 'Settings',
-                'basic_tab': 'Basic',
-                'language_label': 'Language:',
-                'analysis_tab': 'Analysis',
-                'video_tab': 'Video',
-                'advanced_tab': 'Advanced',
-                'ok': 'OK',
-                'cancel': 'Cancel',
-                'reset': 'Reset to Default',
-                'experimental': 'Enable Advanced Pose Analysis',
-                'pose_backend': 'Pose Backend:',
-                'angle_tolerance': 'Angle Tolerance:',
-                'frame_extraction': 'Extraction Method:',
-                'max_frames': 'Max Frames per Video:',
-                'auto_select': 'Auto Select Best Frames',
-                'enhancement': 'Enable Frame Enhancement',
-                'quality_threshold': 'Quality Threshold:',
-                'save_images': 'Save Analysis Images',
-                'output_settings': 'Output Settings',
-                'system_info': 'System Info',
-                'exp_group': 'Experimental Features',
-                'measure_group': 'Measurement Settings',
-                'frame_group': 'Frame Extraction',
-                'image_group': 'Image Processing',
-            }
+            'language': self.i18n.get_current_language()  # 使用I18nManager的当前语言
         }
 
         self.init_ui()
+        self._update_texts()  # 初始化文本
     
-    def init_ui(self):
-        """初始化界面"""
-        layout = QVBoxLayout()
-
-        # 创建标签页
-        self.tab_widget = QTabWidget()
-
-        # 基本设置标签页
-        self.create_basic_tab(self.tab_widget)
-        # 分析设置标签页
-        self.create_analysis_tab(self.tab_widget)
-        # 视频处理标签页
-        self.create_video_tab(self.tab_widget)
-        # 高级设置标签页
-        self.create_advanced_tab(self.tab_widget)
-
-        layout.addWidget(self.tab_widget)
-
-        # 按钮
-        button_layout = QHBoxLayout()
-        self.ok_button = QPushButton(self.tr_text('ok'))
-        self.cancel_button = QPushButton(self.tr_text('cancel'))
-        self.reset_button = QPushButton(self.tr_text('reset'))
-
-        button_layout.addWidget(self.reset_button)
-        button_layout.addStretch()
-        button_layout.addWidget(self.cancel_button)
-        button_layout.addWidget(self.ok_button)
-
-        layout.addLayout(button_layout)
-
-        # 连接信号
-        self.ok_button.clicked.connect(self.accept_settings)
-        self.cancel_button.clicked.connect(self.reject)
-        self.reset_button.clicked.connect(self.reset_to_defaults)
-
-        self.setLayout(layout)
-
-        self.update_language(self.settings['language'])
-
-    def tr_text(self, key):
-        lang = self.settings.get('language', 'zh')
-        return self.translations.get(lang, self.translations['zh']).get(key, key)
+    def tr(self, key: str, **kwargs) -> str:
+        """翻译函数"""
+        return self.i18n.t(key, **kwargs)
+    
+    def _on_language_changed(self):
+        """语言变更回调"""
+        self._update_texts()
+    
+    def _update_texts(self):
+        """更新所有文本"""
+        self.setWindowTitle(self.tr(TK.UI.Settings.TITLE))
+        
+        # 更新标签页标题
+        if hasattr(self, 'tab_widget'):
+            self.tab_widget.setTabText(0, self.tr('ui.settings.basic_tab'))
+            self.tab_widget.setTabText(1, self.tr('ui.settings.analysis_tab'))
+            self.tab_widget.setTabText(2, self.tr('ui.settings.video_tab'))
+            self.tab_widget.setTabText(3, self.tr('ui.settings.advanced_tab'))
+        
+        # 更新按钮文本
+        if hasattr(self, 'ok_button'):
+            self.ok_button.setText(self.tr(TK.UI.Settings.OK))
+            self.cancel_button.setText(self.tr(TK.UI.Settings.CANCEL))
+            self.reset_button.setText(self.tr('ui.settings.reset'))
+        
+        # 更新其他控件文本
+        self._update_control_texts()
 
     def create_basic_tab(self, tab_widget):
         """创建基本设置标签页"""
