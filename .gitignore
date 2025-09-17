@@ -1,3 +1,4 @@
+core/azure_blob_settings.ini
 # Python
 __pycache__/
 *.py[cod]
