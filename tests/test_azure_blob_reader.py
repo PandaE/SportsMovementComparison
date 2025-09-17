@@ -1,22 +1,25 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import pytest
 from core.azure_blob_reader import AzureBlobReader
 
 def test_list_files():
     reader = AzureBlobReader()
-    # 假设 blob 里有 videos/ 目录
-    files = reader.list_files('videos/')
+    # Assume there is a forehandhighclear/ directory in the blob
+    files = reader.list_files('forehandhighclear/')
     assert isinstance(files, list)
-    print('文件列表:', files)
+    print('file list:', files)
 
-    # 可选：断言至少有一个文件
+    # Optional: assert at least one file exists
     # assert len(files) > 0
 
 def test_read_file():
     reader = AzureBlobReader()
-    files = reader.list_files('videos/')
+    files = reader.list_files('forehandhighclear/')
     if files:
         data = reader.read_file(files[0])
         assert isinstance(data, bytes)
-        print(f'文件 {files[0]} 大小: {len(data)} bytes')
+        print(f'File {files[0]} size: {len(data)} bytes')
     else:
-        print('没有可读文件，跳过 read_file 测试')
+        print('No readable files, skipping read_file test')

@@ -1,3 +1,4 @@
+pytest
 azure-storage-blob
 PyQt5>=5.15
 opencv-python>=4.5

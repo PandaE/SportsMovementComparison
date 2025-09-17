@@ -15,7 +15,7 @@ class AzureBlobConfig:
     def get_container_name(self):
         return self.config.get('azure', 'container_name', fallback=None)
 
-# 用法示例：
+# Example usage:
 # cfg = AzureBlobConfig()
 # conn_str = cfg.get_connection_string()
 # container = cfg.get_container_name()
