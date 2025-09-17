@@ -1,6 +1,6 @@
 import sys
 from PyQt5.QtWidgets import QApplication
-from ui.main_window import MainWindow
+from ui.enhanced_main_window import EnhancedMainWindow
 
 def main():
     """
@@ -8,7 +8,7 @@ def main():
     Initializes the QApplication and shows the main window.
     """
     app = QApplication(sys.argv)
-    window = MainWindow()
+    window = EnhancedMainWindow()
     window.show()
     sys.exit(app.exec_())
 
