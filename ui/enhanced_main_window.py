@@ -219,16 +219,30 @@ class EnhancedMainWindow(QWidget, I18nMixin):
             print("用户取消了视频选择")
 
     def import_standard_video(self):
-        """导入标准视频"""
-        file_path = EnhancedDialogs.select_video(self, TK.UI.Dialogs.SELECT_VIDEO)
-        print(f"用户选择的标准视频文件: {repr(file_path)}")
-        if file_path:
-            self.standard_video_path = file_path
-            self.standard_video_player.set_video(file_path)
-            print(f"标准视频路径设置为: {repr(self.standard_video_path)}")
-            self.check_compare_ready()
+        """Import standard video from Azure Blob Storage"""
+        from ui.standard_video_dialog import StandardVideoDialog
+        from core.azure_blob_reader import AzureBlobReader
+        import os
+        sport_display = self.sport_combo.currentText()
+        action_display = self.action_combo.currentText()
+        sport = self.sport_mapping.get(sport_display, 'badminton')
+        action = self.action_mapping.get(action_display, 'clear')
+        dialog = StandardVideoDialog(sport, action, self)
+        result = dialog.exec_()
+        if result == dialog.Accepted:
+            blob_name = dialog.get_selected_blob()
+            if blob_name:
+                cache_dir = os.path.join(os.getcwd(), "standard_videos_cache")
+                if not os.path.exists(cache_dir):
+                    os.makedirs(cache_dir)
+                local_path = os.path.join(cache_dir, os.path.basename(blob_name))
+                reader = AzureBlobReader()
+                reader.download_blob_to_path(blob_name, local_path)
+                self.standard_video_path = local_path
+                self.standard_video_player.set_video(local_path)
+                self.check_compare_ready()
         else:
-            print("用户取消了标准视频选择")
+            print("User cancelled standard video selection.")
 
     def check_compare_ready(self):
         """检查是否可以开始对比"""

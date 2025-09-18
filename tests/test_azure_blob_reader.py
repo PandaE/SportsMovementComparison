@@ -6,8 +6,8 @@ from core.azure_blob_reader import AzureBlobReader
 
 def test_list_files():
     reader = AzureBlobReader()
-    # Assume there is a forehandhighclear/ directory in the blob
-    files = reader.list_files('forehandhighclear/')
+    # Assume there is a badminton/clear/ directory in the blob
+    files = reader.list_files("badminton/clear/")
     assert isinstance(files, list)
     print('file list:', files)
 
@@ -16,7 +16,7 @@ def test_list_files():
 
 def test_read_file():
     reader = AzureBlobReader()
-    files = reader.list_files('forehandhighclear/')
+    files = reader.list_files('badminton/clear/')
     if files:
         data = reader.read_file(files[0])
         assert isinstance(data, bytes)
