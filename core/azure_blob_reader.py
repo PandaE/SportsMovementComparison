@@ -4,27 +4,6 @@ from azure.storage.blob import BlobServiceClient
 from core.azure_blob_config import AzureBlobConfig
 
 class AzureBlobReader:
-    def get_blob_url(self, blob_path, expiry_hours=1):
-        """
-        Get the URL for the specified blob with a SAS token appended.
-        :param blob_path: Path to the blob
-        :param expiry_hours: SAS token expiry in hours
-        :return: URL string with SAS token
-        """
-        from azure.storage.blob import generate_blob_sas, BlobSasPermissions
-        from datetime import datetime, timedelta, timezone
-        account_url = self.service_client.primary_endpoint
-        # Generate SAS token
-        sas_token = generate_blob_sas(
-            account_name=self.service_client.account_name,
-            container_name=self.container_name,
-            blob_name=blob_path,
-            account_key=self.service_client.credential.account_key,
-            permission=BlobSasPermissions(read=True),
-            expiry=datetime.now(timezone.utc) + timedelta(hours=expiry_hours)
-        )
-        return f"{account_url}{self.container_name}/{blob_path}?{sas_token}"
-
     def download_blob_to_path(self, blob_path, local_path):
         """
         Download the specified blob to a local file path if not already exists.
@@ -37,6 +16,21 @@ class AzureBlobReader:
         with open(local_path, 'wb') as f:
             stream = blob_client.download_blob()
             f.write(stream.readall())
+    
+    def download_blob_to_path(self, blob_path, local_path, progress_callback=None):
+        if os.path.exists(local_path):
+            return
+        blob_client = self.container_client.get_blob_client(blob_path)
+        stream = blob_client.download_blob()
+        total = stream.size
+        downloaded = 0
+        with open(local_path, 'wb') as f:
+            for chunk in stream.chunks():
+                f.write(chunk)
+                downloaded += len(chunk)
+                if progress_callback and total:
+                    percent = int(downloaded * 100 / total)
+                    progress_callback(percent)
     def __init__(self, connection_string=None, container_name=None):
         """
         Prefer parameters, otherwise read from config file.

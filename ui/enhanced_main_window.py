@@ -207,6 +207,7 @@ class EnhancedMainWindow(QWidget, I18nMixin):
             self.action_combo.setCurrentIndex(current_index)
 
     def import_user_video(self):
+        self.import_user_btn.setDisabled(True)
         """导入用户视频"""
         file_path = EnhancedDialogs.select_video(self, TK.UI.Dialogs.SELECT_VIDEO)
         print(f"用户选择的视频文件: {repr(file_path)}")
@@ -217,8 +218,10 @@ class EnhancedMainWindow(QWidget, I18nMixin):
             self.check_compare_ready()
         else:
             print("用户取消了视频选择")
+        self.import_user_btn.setDisabled(False)
 
     def import_standard_video(self):
+        self.import_standard_btn.setDisabled(True)
         """Import standard video from Azure Blob Storage"""
         from ui.standard_video_dialog import StandardVideoDialog
         from core.azure_blob_reader import AzureBlobReader
@@ -232,17 +235,41 @@ class EnhancedMainWindow(QWidget, I18nMixin):
         if result == dialog.Accepted:
             blob_name = dialog.get_selected_blob()
             if blob_name:
-                cache_dir = os.path.join(os.getcwd(), "standard_videos_cache")
-                if not os.path.exists(cache_dir):
-                    os.makedirs(cache_dir)
-                local_path = os.path.join(cache_dir, os.path.basename(blob_name))
-                reader = AzureBlobReader()
-                reader.download_blob_to_path(blob_name, local_path)
+                local_path = dialog.get_cache_path(blob_name)
+                if not os.path.exists(local_path):
+                    reader = AzureBlobReader()
+                    from ui.download_progress_dialog import DownloadProgressDialog
+                    from .download_worker import DownloadWorker
+                    from PyQt5.QtCore import QThread
+                    progress_dialog = DownloadProgressDialog(self)
+                    thread = QThread()
+                    worker = DownloadWorker(reader, blob_name, local_path)
+                    worker.moveToThread(thread)
+                    worker.progress.connect(progress_dialog.set_progress)
+                    def finish_handler(path):
+                        progress_dialog.close()
+                        thread.quit()
+                        thread.wait()
+                        worker.deleteLater()
+                        thread.deleteLater()
+                    def error_handler(msg):
+                        progress_dialog.close()
+                        thread.quit()
+                        thread.wait()
+                        worker.deleteLater()
+                        thread.deleteLater()
+                        print(f"Download error: {msg}")
+                    worker.finished.connect(finish_handler)
+                    worker.error.connect(error_handler)
+                    thread.started.connect(worker.run)
+                    progress_dialog.show()
+                    thread.start()
                 self.standard_video_path = local_path
                 self.standard_video_player.set_video(local_path)
                 self.check_compare_ready()
         else:
             print("User cancelled standard video selection.")
+        self.import_standard_btn.setDisabled(False)
 
     def check_compare_ready(self):
         """检查是否可以开始对比"""
