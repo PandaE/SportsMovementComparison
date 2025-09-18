@@ -16,6 +16,7 @@ from localization.i18n_manager import I18nManager
 from localization.translation_keys import TK
 from ui.i18n_mixin import I18nMixin
 from .enhanced_video_player import EnhancedVideoPlayer
+from core.experimental.frame_analyzer.pose_extractor import PoseExtractor
 
 
 class EnhancedStageAnalysisWidget(QWidget, I18nMixin):
@@ -33,6 +34,11 @@ class EnhancedStageAnalysisWidget(QWidget, I18nMixin):
         self.user_video_path = user_video_path
         self.standard_video_path = standard_video_path
         self.comparison_results = comparison_results or {}
+        self.pose_extractor = None
+        try:
+            self.pose_extractor = PoseExtractor(backend="mediapipe")
+        except Exception as e:
+            print(f"Pose extractor init failed in stage widget: {e}")
         
         self.init_ui()
         self.set_frames(user_frame, standard_frame)
@@ -195,12 +201,12 @@ class EnhancedStageAnalysisWidget(QWidget, I18nMixin):
         # 加载用户视频帧
         user_frame = self.extract_frame(self.user_video_path, self.user_frame_spinbox.value())
         if user_frame is not None:
-            self.display_frame(user_frame, self.user_image_label)
+            self.display_frame(user_frame, self.user_image_label, is_user=True)
         
         # 加载标准视频帧
         standard_frame = self.extract_frame(self.standard_video_path, self.standard_frame_spinbox.value())
         if standard_frame is not None:
-            self.display_frame(standard_frame, self.standard_image_label)
+            self.display_frame(standard_frame, self.standard_image_label, is_user=False)
     
     def extract_frame(self, video_path: str, frame_number: int) -> np.ndarray:
         """从视频中提取指定帧"""
@@ -217,29 +223,34 @@ class EnhancedStageAnalysisWidget(QWidget, I18nMixin):
         
         return None
     
-    def display_frame(self, frame: np.ndarray, label: QLabel):
+    def display_frame(self, frame: np.ndarray, label: QLabel, is_user: bool):
         """在标签中显示帧"""
         try:
-            # 转换颜色空间
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-            # 调整大小
-            h, w, ch = rgb_frame.shape
+            # 添加姿态骨架
+            if self.pose_extractor:
+                try:
+                    pose = self.pose_extractor.extract_pose_from_image(frame)
+                    if pose:
+                        color = (0,255,0) if not is_user else (0,128,255)
+                        vis = self.pose_extractor.visualize_pose(frame, pose, color=color, point_radius=7, line_thickness=4)
+                        rgb_frame = cv2.cvtColor(vis, cv2.COLOR_BGR2RGB)
+                except Exception as pe:
+                    print(f"Stage pose draw failed: {pe}")
+            h, w, _ = rgb_frame.shape
             target_w, target_h = 200, 150
-
-            # 计算缩放比例，保持宽高比
-            scale = min(target_w/w, target_h/h)
-            new_w, new_h = int(w*scale), int(h*scale)
-
-            resized = cv2.resize(rgb_frame, (new_w, new_h))
-
-            # 转换为QPixmap
-            bytes_per_line = 3 * new_w
-            q_image = QImage(resized.data, new_w, new_h, bytes_per_line, QImage.Format_RGB888)
-            q_pixmap = QPixmap.fromImage(q_image)
-
-            label.setPixmap(q_pixmap)
-            label.setScaledContents(True)
+            scale = min(target_w / w, target_h / h)
+            new_w, new_h = int(w * scale), int(h * scale)
+            resized = cv2.resize(rgb_frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
+            import numpy as np
+            canvas = np.full((target_h, target_w, 3), 245, dtype=np.uint8)
+            y_off = (target_h - new_h) // 2
+            x_off = (target_w - new_w) // 2
+            canvas[y_off:y_off+new_h, x_off:x_off+new_w] = resized
+            bytes_per_line = 3 * target_w
+            q_image = QImage(canvas.data, target_w, target_h, bytes_per_line, QImage.Format_RGB888)
+            label.setPixmap(QPixmap.fromImage(q_image))
+            label.setScaledContents(False)
 
         except Exception as e:
             print(f"显示帧失败: {e}")
@@ -282,16 +293,28 @@ class EnhancedStageAnalysisWidget(QWidget, I18nMixin):
         measurements = self.comparison_results.get('measurements', [])
         if measurements:
             results_text += f"{self.translate(TK.UI.Analysis.MEASUREMENTS)}\n"
+            is_new_eval = any('feedback' in m or 'raw_score' in m for m in measurements)
             for measurement in measurements:
                 rule_name = measurement.get('rule_name', self.translate(TK.UI.Analysis.UNKNOWN_RULE))
                 user_value = measurement.get('user_value', 0)
                 standard_value = measurement.get('standard_value', 0)
                 is_within_range = measurement.get('is_within_range', False)
+                feedback = measurement.get('feedback')
+                raw_score = measurement.get('raw_score')
 
                 status_icon = "✅" if is_within_range else "❌"
-                user_text = self.translate(TK.UI.Analysis.USER)
-                standard_text = self.translate(TK.UI.Analysis.STANDARD)
-                results_text += f"  {status_icon} {rule_name}: {user_text} {user_value:.1f}° vs {standard_text} {standard_value:.1f}°\n"
+                if is_new_eval and (standard_value == 0 or standard_value is None):
+                    line = f"  {status_icon} {rule_name}: {user_value:.2f}"
+                    if isinstance(raw_score, (int, float)):
+                        line += f" ({raw_score:.0%})"
+                    results_text += line + "\n"
+                    if feedback:
+                        # 简单换行缩进
+                        results_text += f"     ↳ {self.translate(TK.UI.Analysis.SUGGESTION)}: {feedback}\n"
+                else:
+                    user_text = self.translate(TK.UI.Analysis.USER)
+                    standard_text = self.translate(TK.UI.Analysis.STANDARD)
+                    results_text += f"  {status_icon} {rule_name}: {user_text} {user_value:.1f}° vs {standard_text} {standard_value:.1f}°\n"
 
         if not results_text.strip():
             results_text = self.translate(TK.UI.Analysis.NO_DETAIL)
@@ -473,9 +496,37 @@ class EnhancedAdvancedAnalysisWindow(QMainWindow, I18nMixin):
     def extract_stages_data(self) -> list:
         """从对比结果中提取阶段数据"""
         stages_data = []
-        
-        # 如果有详细的阶段数据，使用它们
-        if 'stages' in self.comparison_results:
+        # 优先：新评价输出
+        new_eval = self.comparison_results.get('new_evaluation') if isinstance(self.comparison_results, dict) else None
+        if new_eval and isinstance(new_eval, dict) and 'stages' in new_eval:
+            for st in new_eval.get('stages', []):
+                stage_name = st.get('name')
+                score = st.get('score', 0)
+                mapped_results = {
+                    'stage_info': {
+                        'score': score * 100,
+                        'status': st.get('summary') or f"{stage_name} - evaluation"
+                    },
+                    'measurements': []
+                }
+                for m in st.get('measurements', []):
+                    mapped_results['measurements'].append({
+                        'rule_name': m.get('key'),
+                        'user_value': m.get('value', 0),
+                        'standard_value': 0,
+                        'is_within_range': m.get('passed', False)
+                    })
+                stages_data.append({
+                    'name': stage_name,
+                    'user_frame': 0,
+                    'standard_frame': 0,
+                    'results': mapped_results
+                })
+            if stages_data:
+                return stages_data
+
+        # 其次：旧的详细阶段数据
+        if isinstance(self.comparison_results, dict) and 'stages' in self.comparison_results:
             for stage_name, stage_info in self.comparison_results['stages'].items():
                 stages_data.append({
                     'name': stage_name,
@@ -484,13 +535,13 @@ class EnhancedAdvancedAnalysisWindow(QMainWindow, I18nMixin):
                     'results': stage_info
                 })
         else:
-            # 否则创建默认阶段
+            # 回退默认
             stages_data = [
                 {
                     'name': 'setup_stage',
                     'user_frame': 30,
                     'standard_frame': 25,
-                    'results': self.comparison_results
+                    'results': self.comparison_results if isinstance(self.comparison_results, dict) else {}
                 },
                 {
                     'name': 'impact_stage',
@@ -519,6 +570,11 @@ class EnhancedAdvancedAnalysisWindow(QMainWindow, I18nMixin):
         """重新分析指定阶段"""
         try:
             print(f"🔄 开始重新分析阶段: {stage_name}")
+
+            # 使用新评价数据时暂不支持此处增量重算
+            if isinstance(self.comparison_results, dict) and 'new_evaluation' in self.comparison_results:
+                print("ℹ️ 当前显示为 new_evaluation 结果，窗口内暂未实现增量更新。")
+                return
             
             # 检查是否有可用的分析引擎
             if not hasattr(self, 'analysis_engine'):

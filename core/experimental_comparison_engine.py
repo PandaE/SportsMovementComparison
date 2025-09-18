@@ -11,6 +11,7 @@ from .experimental.frame_analyzer.frame_comparator import FrameComparator
 from .experimental.frame_analyzer.pose_extractor import PoseExtractor
 from .experimental.frame_analyzer.key_frame_extractor import KeyFrameExtractor
 from .experimental.config.sport_configs import SportConfigs
+from .pipeline.evaluation_pipeline import run_action_evaluation
 
 
 class ExperimentalComparisonEngine(ComparisonEngine):
@@ -78,7 +79,7 @@ class ExperimentalComparisonEngine(ComparisonEngine):
             
             print(f"✅ 关键帧提取完成，共提取 {len(user_stage_frames)} 个阶段的帧")
             
-            # 3. 执行多阶段对比分析
+            # 3. 执行多阶段对比分析 (旧对比逻辑保留)
             results = []
             overall_score = 0.0
             
@@ -127,7 +128,45 @@ class ExperimentalComparisonEngine(ComparisonEngine):
                 'action': action
             }
             
-            print(f"🏆 分析完成，总分: {overall_score:.2f}")
+            print(f"🏆 旧对比分析完成，总分: {overall_score:.2f}")
+
+            # 7. 新增：基于 Metrics + Evaluation 的统一评分 (仅使用用户视频关键帧，不再与标准逐帧差分)
+            try:
+                # 复用已抽取的用户阶段帧作为 pose 计算输入
+                # 仅当用户帧存在时执行
+                if user_stage_frames:
+                    # 提取每阶段 pose（单帧）
+                    stage_pose_map = {}
+                    for stage in config.stages:
+                        if stage.name in user_stage_frames:
+                            pose = self.frame_comparator.pose_extractor.extract_pose_from_image(user_stage_frames[stage.name], 0)
+                            if pose:
+                                stage_pose_map[stage.name] = (pose, 0)
+                    if stage_pose_map:
+                        metrics_result, evaluation = run_action_evaluation(config, stage_pose_map, language='zh_CN')
+                        result['new_evaluation'] = {
+                            'overall_score': evaluation.score,
+                            'summary': evaluation.summary,
+                            'stages': [
+                                {
+                                    'name': st.name,
+                                    'score': st.score,
+                                    'measurements': [
+                                        {
+                                            'key': mv.key,
+                                            'value': mv.value,
+                                            'score': mv.score,
+                                            'passed': mv.passed,
+                                            'feedback': mv.feedback,
+                                        } for mv in st.measurements
+                                    ]
+                                } for st in evaluation.stages
+                            ]
+                        }
+                        print("🆕 新评价模块输出完成 (new_evaluation 键)")
+            except Exception as ee:
+                print(f"新评价模块执行失败: {ee}")
+
             return result
             
         except Exception as e:

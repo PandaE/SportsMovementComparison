@@ -1,4 +1,6 @@
 import sys
+# DEPRECATED: This legacy MainWindow is kept temporarily for backward compatibility.
+# New code should use EnhancedMainWindow (ui/enhanced_main_window.py). Will be removed after migration.
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, 
     QCheckBox, QGroupBox, QFormLayout, QMenuBar, QAction

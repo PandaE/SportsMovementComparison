@@ -27,6 +27,8 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
         self.user_video_path = user_video_path
         self.standard_video_path = standard_video_path
         self.is_experimental = comparison_result.get('analysis_type') == 'experimental'
+        # Detect new evaluation presence
+        self.new_evaluation = comparison_result.get('new_evaluation')
         
         self.setGeometry(150, 150, 1400, 900)
         self.init_ui()
@@ -53,9 +55,16 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
             score = self.comparison_result.get('score', 0)
             self.score_label.setText(f"{self.translate(TK.UI.RESULTS.SCORE)}: {score}")
         
-        if hasattr(self, 'detail_label') and self.is_experimental:
-            detailed_score = self.comparison_result.get('detailed_score', 0)
-            self.detail_label.setText(f"{self.translate(TK.UI.RESULTS.DETAILED_SCORE)}: {detailed_score:.2%}")
+        if hasattr(self, 'detail_label') and (self.is_experimental or self.new_evaluation):
+            if self.new_evaluation:
+                new_score = self.new_evaluation.get('overall_score')
+                if new_score is not None:
+                    self.detail_label.setText(f"Eval Score: {new_score:.2f}")
+                else:
+                    self.detail_label.setText("Eval Score: N/A")
+            else:
+                detailed_score = self.comparison_result.get('detailed_score', 0)
+                self.detail_label.setText(f"{self.translate(TK.UI.RESULTS.DETAILED_SCORE)}: {detailed_score:.2%}")
         
         # 更新标签页标题
         if hasattr(self, 'tab_widget'):
@@ -199,8 +208,50 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
             }
         """)
 
-        for movement in self.comparison_result.get('key_movements', []):
+        # Existing legacy movements (旧评估数据)
+        legacy_movements = self.comparison_result.get('key_movements', [])
+        for movement in legacy_movements:
             self.add_movement_item(movement)
+
+        # New Evaluation summary (整体评价)
+        if self.new_evaluation:
+            overall_summary = self.new_evaluation.get('summary')
+            if overall_summary:
+                summary_item = {
+                    'name': 'Evaluation Summary',
+                    'summary': overall_summary,
+                    'suggestion': overall_summary,
+                    'score': self.new_evaluation.get('overall_score', 0),
+                    'evaluation_summary': True
+                }
+                self.add_movement_item(summary_item)
+
+            # Map new evaluation stages (新评价阶段)
+            existing_names = {m.get('name') for m in legacy_movements}
+            for st in self.new_evaluation.get('stages', []):
+                stage_name = st.get('name')
+                if stage_name in existing_names:
+                    continue
+                measurements = st.get('measurements', [])
+                fails = [m for m in measurements if m.get('passed') is False]
+                if fails:
+                    # Use feedback from failed measurements; pick up to 2
+                    fail_feedback = [m.get('feedback') for m in fails if m.get('feedback')]
+                    if not fail_feedback:
+                        fail_feedback = [f"{len(fails)} measurements need improvement"]
+                    suggestion_text = ' | '.join(fail_feedback[:2])
+                else:
+                    suggestion_text = 'All measurements acceptable'
+
+                pseudo = {
+                    'name': stage_name,
+                    'summary': f"Stage Score: {st.get('score', 0):.2f}",
+                    'suggestion': suggestion_text,
+                    'score': st.get('score', 0),
+                    # Keep original raw evaluation measurements for richer formatting
+                    'evaluation_measurements': measurements
+                }
+                self.add_movement_item(pseudo)
 
         analysis_layout.addWidget(self.movements_list)
         analysis_widget.setLayout(analysis_layout)
@@ -210,13 +261,34 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
         """添加动作项目"""
         item = QListWidgetItem()
         
-        # 构建显示文本
-        display_text = f"【{movement['name']}】\n"
-        display_text += f"{self.translate(TK.UI.RESULTS.ANALYSIS_RESULT)}: {movement['summary']}\n"
-        display_text += f"{self.translate(TK.UI.RESULTS.SUGGESTION)}: {movement['suggestion']}"
-        
-        # 如果是实验结果，添加更多详细信息
-        if self.is_experimental and 'detailed_measurements' in movement:
+        name = movement.get('name', 'Stage')
+        display_text = f"【{name}】\n"
+
+        # Evaluation Summary special case
+        if movement.get('evaluation_summary'):
+            display_text += movement.get('summary', '')
+        else:
+            display_text += f"{self.translate(TK.UI.RESULTS.ANALYSIS_RESULT)}: {movement.get('summary','')}\n"
+            display_text += f"{self.translate(TK.UI.RESULTS.SUGGESTION)}: {movement.get('suggestion','')}"
+
+        # New evaluation measurement rich formatting
+        if 'evaluation_measurements' in movement:
+            display_text += f"\n\n{self.translate(TK.UI.RESULTS.DETAILED_MEASUREMENTS)}:"
+            eval_meas = movement['evaluation_measurements']
+            for m in eval_meas:
+                key = m.get('key')
+                val = m.get('value')
+                score = m.get('score')
+                passed = m.get('passed')
+                feedback = m.get('feedback')
+                icon = '✅' if passed else '❌'
+                val_txt = f"{val:.2f}" if isinstance(val, (int, float)) else str(val)
+                score_txt = f"{score:.0%}" if isinstance(score, (int, float)) else 'N/A'
+                feedback_txt = f" - {feedback}" if feedback else ''
+                display_text += f"\n  {icon} {key}: {val_txt}  ({score_txt}){feedback_txt}"
+
+        # 旧实验详细测量（保留原逻辑）
+        if self.is_experimental and 'detailed_measurements' in movement and 'evaluation_measurements' not in movement:
             display_text += f"\n\n{self.translate(TK.UI.RESULTS.DETAILED_MEASUREMENTS)}:"
             for measurement in movement['detailed_measurements']:
                 display_text += f"\n{measurement}"
@@ -224,7 +296,7 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
         item.setText(display_text)
         
         # 根据得分设置颜色
-        if self.is_experimental and 'score' in movement:
+        if (self.is_experimental or 'evaluation_measurements' in movement or movement.get('evaluation_summary')) and 'score' in movement:
             score = movement['score']
             if score >= 0.8:
                 item.setBackground(Qt.green)

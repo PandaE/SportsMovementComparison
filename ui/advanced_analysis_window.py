@@ -50,6 +50,7 @@ class StageAnalysisWidget(QWidget):
                 'score': '📈 阶段得分',
                 'status': '📊 分析结果',
                 'measurements': '📏 测量对比:',
+                'feedback': '反馈',
                 'user': '用户',
                 'standard': '标准',
                 'no_detail': '暂无详细对比数据',
@@ -69,6 +70,7 @@ class StageAnalysisWidget(QWidget):
                 'score': '📈 Stage Score',
                 'status': '📊 Analysis',
                 'measurements': '📏 Measurements:',
+                'feedback': 'Feedback',
                 'user': 'User',
                 'standard': 'Standard',
                 'no_detail': 'No detailed comparison',
@@ -214,27 +216,25 @@ class StageAnalysisWidget(QWidget):
     def display_frame(self, frame: np.ndarray, label: QLabel):
         """在标签中显示帧"""
         try:
-            # 转换颜色空间
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-            # 调整大小
-            h, w, ch = rgb_frame.shape
+            h, w, _ = rgb_frame.shape
             target_w, target_h = 200, 150
+            scale = min(target_w / w, target_h / h)
+            new_w, new_h = int(w * scale), int(h * scale)
+            resized = cv2.resize(rgb_frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
-            # 计算缩放比例，保持宽高比
-            scale = min(target_w/w, target_h/h)
-            new_w, new_h = int(w*scale), int(h*scale)
+            # 创建带填充背景，避免拉伸
+            import numpy as np
+            canvas = np.full((target_h, target_w, 3), 245, dtype=np.uint8)
+            y_off = (target_h - new_h) // 2
+            x_off = (target_w - new_w) // 2
+            canvas[y_off:y_off+new_h, x_off:x_off+new_w] = resized
 
-            resized = cv2.resize(rgb_frame, (new_w, new_h))
-
-            # 转换为QPixmap - 修复图像格式
             from PyQt5.QtGui import QImage
-            bytes_per_line = 3 * new_w
-            q_image = QImage(resized.data, new_w, new_h, bytes_per_line, QImage.Format_RGB888)
-            q_pixmap = QPixmap.fromImage(q_image)
-
-            label.setPixmap(q_pixmap)
-            label.setScaledContents(True)
+            bytes_per_line = 3 * target_w
+            q_image = QImage(canvas.data, target_w, target_h, bytes_per_line, QImage.Format_RGB888)
+            label.setPixmap(QPixmap.fromImage(q_image))
+            label.setScaledContents(False)
 
         except Exception as e:
             print(f"显示帧失败: {e}")
@@ -277,14 +277,26 @@ class StageAnalysisWidget(QWidget):
         measurements = self.comparison_results.get('measurements', [])
         if measurements:
             results_text += f"{self.tr_text('measurements')}\n"
+            is_new_eval = any('feedback' in m or 'raw_score' in m for m in measurements)
             for measurement in measurements:
                 rule_name = measurement.get('rule_name', self.tr_text('unknown_rule'))
                 user_value = measurement.get('user_value', 0)
                 standard_value = measurement.get('standard_value', 0)
                 is_within_range = measurement.get('is_within_range', False)
+                feedback = measurement.get('feedback')
+                raw_score = measurement.get('raw_score')
 
                 status_icon = "✅" if is_within_range else "❌"
-                results_text += f"  {status_icon} {rule_name}: {self.tr_text('user')} {user_value:.1f}° vs {self.tr_text('standard')} {standard_value:.1f}°\n"
+                if is_new_eval and (standard_value == 0 or standard_value is None):
+                    # 新评价格式：显示值与分数/反馈
+                    line = f"  {status_icon} {rule_name}: {user_value:.2f}"
+                    if isinstance(raw_score, (int, float)):
+                        line += f" ({raw_score:.0%})"
+                    results_text += line + "\n"
+                    if feedback:
+                        results_text += f"     ↳ {self.tr_text('feedback')}: {feedback}\n"
+                else:
+                    results_text += f"  {status_icon} {rule_name}: {self.tr_text('user')} {user_value:.1f}° vs {self.tr_text('standard')} {standard_value:.1f}°\n"
 
         if not results_text.strip():
             results_text = self.tr_text('no_detail')
@@ -464,9 +476,39 @@ class AdvancedAnalysisWindow(QMainWindow):
     def extract_stages_data(self) -> list:
         """从对比结果中提取阶段数据"""
         stages_data = []
-        
-        # 如果有详细的阶段数据，使用它们
-        if 'stages' in self.comparison_results:
+        # 优先：使用新评价管线输出 (new_evaluation)
+        new_eval = self.comparison_results.get('new_evaluation') if isinstance(self.comparison_results, dict) else None
+        if new_eval and isinstance(new_eval, dict) and 'stages' in new_eval:
+            for st in new_eval.get('stages', []):
+                # new_evaluation stage dict keys: name, score, measurements(list)
+                stage_name = st.get('name')
+                score = st.get('score', 0)
+                # 映射为组件期望的 comparison_results 结构
+                mapped_results = {
+                    'stage_info': {
+                        'score': score * 100,  # 转换为百分比显示
+                        'status': st.get('summary') or f"{stage_name} - 评估完成"
+                    },
+                    'measurements': []
+                }
+                for m in st.get('measurements', []):
+                    mapped_results['measurements'].append({
+                        'rule_name': m.get('key'),
+                        'user_value': m.get('value', 0),
+                        'standard_value': 0,  # 新评价暂不与标准帧直接比较
+                        'is_within_range': m.get('passed', False),
+                    })
+                stages_data.append({
+                    'name': stage_name,
+                    'user_frame': 0,
+                    'standard_frame': 0,
+                    'results': mapped_results
+                })
+            if stages_data:
+                return stages_data
+
+        # 其次：旧的详细阶段数据 (legacy 'stages')
+        if isinstance(self.comparison_results, dict) and 'stages' in self.comparison_results:
             for stage_name, stage_info in self.comparison_results['stages'].items():
                 stages_data.append({
                     'name': stage_name,
@@ -475,13 +517,13 @@ class AdvancedAnalysisWindow(QMainWindow):
                     'results': stage_info
                 })
         else:
-            # 否则创建默认阶段
+            # 回退：默认占位阶段
             stages_data = [
                 {
                     'name': '架拍阶段结束',
                     'user_frame': 30,
                     'standard_frame': 25,
-                    'results': self.comparison_results
+                    'results': self.comparison_results if isinstance(self.comparison_results, dict) else {}
                 },
                 {
                     'name': '击球瞬间',
@@ -510,6 +552,11 @@ class AdvancedAnalysisWindow(QMainWindow):
         """重新分析指定阶段"""
         try:
             print(f"🔄 开始重新分析阶段: {stage_name}")
+
+            # 如果使用的是新评价结果，目前暂不支持在此窗口内增量重算，直接提示并返回
+            if isinstance(self.comparison_results, dict) and 'new_evaluation' in self.comparison_results:
+                print("ℹ️ 当前显示来自 new_evaluation 的阶段评分，暂未支持在此界面内增量重计算。")
+                return
             
             # 检查是否有可用的分析引擎
             if not hasattr(self, 'analysis_engine'):

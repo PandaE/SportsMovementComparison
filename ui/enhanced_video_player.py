@@ -36,12 +36,16 @@ class EnhancedVideoPlayer(QWidget, I18nMixin):
         QWidget.__init__(self, parent)
         I18nMixin.__init__(self)  # 初始化国际化混入
 
-        # 视频相关属性
+        # 基础视频属性
         self.video_path = None
         self.cap = None
         self.total_frames = 0
         self.current_frame = 0
         self.fps = 30.0
+        self.src_width = None
+        self.src_height = None
+        self.min_video_height = 180
+        self.max_video_height = 500  # 防止无限拉伸
 
         # 播放控制
         self.is_playing = False
@@ -49,10 +53,10 @@ class EnhancedVideoPlayer(QWidget, I18nMixin):
         self.play_timer = QTimer()
         self.play_timer.timeout.connect(self.next_frame)
 
-        # 姿态检测相关
+        # 姿态检测
         self.pose_extractor = None
         self.show_pose = False
-        self.pose_color = (0, 255, 0)  # 默认绿色
+        self.pose_color = (0, 255, 0)
         if POSE_AVAILABLE:
             try:
                 self.pose_extractor = PoseExtractor(backend="mediapipe")
@@ -60,32 +64,53 @@ class EnhancedVideoPlayer(QWidget, I18nMixin):
             except Exception as e:
                 print(f"姿态检测器初始化失败: {e}")
 
+        # 初始化界面
         self.init_ui()
         self.setup_connections()
-        self.update_ui_texts()  # 初始化文本
+        self.update_ui_texts()
     
     def init_ui(self):
         """初始化用户界面"""
         layout = QVBoxLayout()
         layout.setSpacing(5)
         
-        # 视频显示区域
+        # 视频显示容器
+        from PyQt5.QtWidgets import QFrame
+        self.video_container = QFrame()
+        self.video_container.setObjectName("videoContainer")
+        container_layout = QVBoxLayout(self.video_container)
+        container_layout.setContentsMargins(4,4,4,4)
+        container_layout.setSpacing(0)
+
         self.video_frame = QLabel()
-        self.video_frame.setMinimumHeight(200)
-        self.video_frame.setMaximumHeight(400)
+        self.video_frame.setObjectName("videoFrame")
+        self.video_frame.setMinimumHeight(220)
         self.video_frame.setStyleSheet("""
-            QLabel {
-                border: 2px dashed #cccccc;
-                border-radius: 5px;
-                background-color: #f5f5f5;
-                text-align: center;
-                color: #666666;
+            QFrame#videoContainer {
+                border: 2px solid #d0d7e2;
+                border-radius: 8px;
+                background-color: #fafbfc;
+            }
+            QLabel#videoFrame {
+                background-color: #ffffff;
+                border: 1px solid #e0e0e0;
+                border-radius: 4px;
+                color: #888888;
                 font-size: 14px;
             }
         """)
         self.video_frame.setAlignment(Qt.AlignCenter)
-        self.video_frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        layout.addWidget(self.video_frame)
+        # 默认锁定宽度，避免在布局中被不断拉伸
+        self.lock_width = True
+        self.default_width = 400
+        self.video_container.setMinimumWidth(self.default_width)
+        self.video_container.setMaximumWidth(self.default_width)
+        self.video_frame.setMinimumWidth(self.default_width - 8)
+        self.video_frame.setMaximumWidth(self.default_width - 8)
+        # 横向固定，纵向可扩展
+        self.video_frame.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        container_layout.addWidget(self.video_frame, 1)
+        layout.addWidget(self.video_container, 1)
         
         # 进度条
         self.progress_slider = QSlider(Qt.Horizontal)
@@ -231,7 +256,16 @@ class EnhancedVideoPlayer(QWidget, I18nMixin):
         self.progress_slider.setMaximum(self.total_frames - 1)
         self.progress_slider.setValue(0)
         
-        # 显示第一帧
+        # 读取第一帧以获取源尺寸
+        if self.cap.isOpened():
+            self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, frame0 = self.cap.read()
+            if ret:
+                self.src_height, self.src_width = frame0.shape[:2]
+                # 回退帧指针
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        # 调整高度后再显示
+        self._update_size_constraints()
         self.display_current_frame()
         self.update_frame_info()
         
@@ -259,20 +293,18 @@ class EnhancedVideoPlayer(QWidget, I18nMixin):
             except Exception as e:
                 print(f"姿态检测失败: {e}")
         
+        # 记录源尺寸（若首次显示且尚未记录）
+        if self.src_width is None or self.src_height is None:
+            self.src_height, self.src_width = frame.shape[:2]
+            self._update_size_constraints()
         # 转换为QPixmap并显示
         height, width, channel = frame.shape
         bytes_per_line = 3 * width
         q_image = QImage(frame.data, width, height, bytes_per_line, QImage.Format_RGB888).rgbSwapped()
         
-        # 缩放到合适大小
         pixmap = QPixmap.fromImage(q_image)
-        scaled_pixmap = pixmap.scaled(
-            self.video_frame.size(), 
-            Qt.KeepAspectRatio, 
-            Qt.SmoothTransformation
-        )
-        
-        self.video_frame.setPixmap(scaled_pixmap)
+        self._original_pixmap = pixmap  # 保存原始尺寸用于后续自适应
+        self._update_scaled_pixmap()
         
         # 发出信号
         self.frame_changed.emit(self.current_frame)
@@ -391,6 +423,83 @@ class EnhancedVideoPlayer(QWidget, I18nMixin):
         if self.cap:
             self.cap.release()
         event.accept()
+
+    # ===== 自适应缩放处理 =====
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # 如果解锁宽度则允许自适应，否则保持固定宽度
+        if not self.lock_width:
+            # 允许容器随父布局伸缩，但保持最小宽度
+            self.video_container.setMaximumWidth(16777215)  # Qt 默认最大
+            self.video_frame.setMaximumWidth(16777215)
+            self._update_size_constraints()  # 宽度变化时重新计算高度
+        self._update_scaled_pixmap()
+
+    def _update_scaled_pixmap(self):
+        if hasattr(self, '_original_pixmap') and not self._original_pixmap.isNull():
+            # 如果锁定宽度，使用预设宽度（防止布局抖动不断变宽）
+            if self.lock_width:
+                target_w = self.default_width - 8
+            else:
+                target_w = max(1, self.video_frame.width())
+            target_h = max(1, self.video_frame.height())
+            src_w = self._original_pixmap.width()
+            src_h = self._original_pixmap.height()
+            if src_w == 0 or src_h == 0:
+                return
+            scale = min(target_w / src_w, target_h / src_h)
+            new_w = int(src_w * scale)
+            new_h = int(src_h * scale)
+            scaled = self._original_pixmap.scaled(new_w, new_h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            # 创建 letterbox 画布
+            from PyQt5.QtGui import QPainter, QPixmap
+            canvas = QPixmap(target_w, target_h)
+            canvas.fill(Qt.white)
+            painter = QPainter(canvas)
+            x_off = (target_w - new_w) // 2
+            y_off = (target_h - new_h) // 2
+            painter.drawPixmap(x_off, y_off, scaled)
+            painter.end()
+            self.video_frame.setPixmap(canvas)
+
+    # ===== 公共接口 =====
+    def unlock_auto_width(self):
+        """允许播放器按布局自动拉伸宽度"""
+        self.lock_width = False
+        self.video_container.setMaximumWidth(16777215)
+        self.video_frame.setMaximumWidth(16777215)
+        self._update_size_constraints()
+        self._update_scaled_pixmap()
+
+    def lock_fixed_width(self, width: int | None = None):
+        """重新锁定固定宽度"""
+        if width and width > 100:
+            self.default_width = width
+        self.lock_width = True
+        self.video_container.setMinimumWidth(self.default_width)
+        self.video_container.setMaximumWidth(self.default_width)
+        self.video_frame.setMinimumWidth(self.default_width - 8)
+        self.video_frame.setMaximumWidth(self.default_width - 8)
+        self._update_size_constraints()
+        self._update_scaled_pixmap()
+
+    def _update_size_constraints(self):
+        """根据源视频宽高比动态调整高度（带上下限），保证完整显示且不无限扩张"""
+        if self.src_width and self.src_height:
+            # 基于当前（锁定或解锁）宽度计算目标高度
+            if self.lock_width:
+                base_w = self.default_width - 8
+            else:
+                base_w = max(100, self.video_container.width())
+            aspect_h = int(base_w * (self.src_height / self.src_width))
+            target_h = min(max(aspect_h, self.min_video_height), self.max_video_height)
+        else:
+            target_h = self.min_video_height
+        # 同步到控件
+        self.video_frame.setMinimumHeight(target_h)
+        self.video_frame.setMaximumHeight(target_h)
+        self.video_container.setMinimumHeight(target_h + 20)
+        self.video_container.setMaximumHeight(target_h + 20)
 
 
 # 为了保持向后兼容，创建一个别名

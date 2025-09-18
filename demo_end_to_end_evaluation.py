@@ -22,13 +22,7 @@ from core.utils.pose_utils import extract_pose  # type: ignore
 from core.experimental.frame_analyzer.pose_extractor import PoseExtractor  # type: ignore
 from core.experimental.models.pose_data import BodyPose, PoseKeypoint  # type: ignore
 from core.experimental.config.sport_configs import SportConfigs  # type: ignore
-from core.metrics_engine import MetricsEngine  # type: ignore
-from core.evaluation import (
-    MeasurementRule as EvalMeasurementRule,
-    StageRule as EvalStageRule,
-    ActionEvaluationConfig,
-    evaluate_action,
-)  # type: ignore
+from core.pipeline.evaluation_pipeline import run_action_evaluation  # type: ignore
 
 
 def pose_from_landmarks(result_dict) -> BodyPose:
@@ -81,54 +75,7 @@ def extract_body_pose(image_path: str) -> BodyPose:
         return pose
 
 
-def build_evaluation_config(action_config, language: str) -> ActionEvaluationConfig:
-    # Map experimental sport config to evaluation config rules.
-    stages = []
-    for st in action_config.stages:
-        eval_rules = []
-        for mr in st.measurements:
-            # Convert tolerance range (min,max) to center+radius for scoring target/tolerance if angle-like
-            target = None
-            tolerance = None
-            if mr.tolerance_range:
-                min_v, max_v = mr.tolerance_range
-                target = (min_v + max_v) / 2.0
-                tolerance = (max_v - min_v) / 2.0
-            eval_rules.append(EvalMeasurementRule(
-                key=mr.name,  # reuse measurement name as key
-                target=target,
-                tolerance=tolerance,
-                min_value=mr.tolerance_range[0] if mr.tolerance_range else None,
-                max_value=mr.tolerance_range[1] if mr.tolerance_range else None,
-                weight=mr.weight,
-                description={'zh_CN': mr.description, 'en_US': mr.description},
-                score_strategy='linear'
-            ))
-        stages.append(EvalStageRule(
-            name=st.name,
-            measurements=eval_rules,
-            weight=st.weight,
-            description={'zh_CN': st.description, 'en_US': st.description}
-        ))
-    return ActionEvaluationConfig(
-        action_name=action_config.name,
-        stages=stages,
-        language=language,
-        enable_scoring=True,
-        enable_llm_refine=False,
-    )
-
-
-def build_metrics_dict(action_result) -> dict:
-    # Convert ActionMetricsResult -> evaluation metrics dict shape {stage: {measurement_key: {'value': float}}}
-    out = {}
-    for stage_res in action_result.stage_results:
-        md = {}
-        for name, mv in stage_res.measurements.items():
-            if mv.value is not None:
-                md[name] = {'value': mv.value}
-        out[stage_res.stage_name] = md
-    return out
+## Removed custom build functions in favor of pipeline helpers
 
 
 def main():
@@ -148,18 +95,8 @@ def main():
     # 3. Build a naive stage_pose_map: reuse same pose for all configured stages
     stage_pose_map = {st.name: (user_pose, 0) for st in action_config.stages}
 
-    # 4. Run metrics
-    engine = MetricsEngine()
-    action_metrics = engine.compute_action(action_config, stage_pose_map)
-
-    # 5. Convert metrics to evaluation input dict
-    metrics_dict = build_metrics_dict(action_metrics)
-
-    # 6. Build evaluation config
-    eval_config = build_evaluation_config(action_config, args.lang)
-
-    # 7. Evaluate
-    evaluation = evaluate_action(metrics_dict, eval_config)
+    # 4-7. Run unified pipeline (metrics + evaluation)
+    action_metrics, evaluation = run_action_evaluation(action_config, stage_pose_map, language=args.lang)
 
     # 8. Print results
     print('=== Evaluation Summary ===')
@@ -178,7 +115,7 @@ def main():
             print(f"  - {mv.key}: value={value_str} score={score_str} passed={mv.passed} -> {mv.feedback}")
 
     if args.print_json:
-        # Minimal JSON export
+        from dataclasses import asdict
         data = {
             'action': evaluation.action_name,
             'score': evaluation.score,
