@@ -237,23 +237,6 @@ class EnhancedVideoPlayer(QWidget, I18nMixin):
         
         return True
     
-    def set_video_from_blob(self, blob_url, blobname):
-        """
-		Download video from blob URL to local cache and play it.
-		:param blob_url: The blob URL (with SAS token if needed)
-		"""
-        local_path = self._get_cache_path(blobname)
-        if not os.path.exists(local_path):
-            self._download_video(blob_url, local_path)
-        self.set_video(local_path)
-    
-    def _get_cache_path(self, blobname):
-        cache_dir = os.path.join(os.getcwd(), "standard_videos_cache")
-        if not os.path.exists(cache_dir):
-            os.makedirs(cache_dir)
-        local_path = os.path.join(cache_dir, os.path.basename(blobname))
-        return local_path
-
     def display_current_frame(self):
         """显示当前帧"""
         if not self.cap or not self.cap.isOpened():
