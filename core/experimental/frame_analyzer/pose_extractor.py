@@ -34,8 +34,8 @@ class PoseExtractor:
                 )
                 self.mp_drawing = mp.solutions.drawing_utils
                 print("MediaPipe姿态检测器初始化成功")
-            except ImportError:
-                print("MediaPipe未安装，切换到模拟模式")
+            except ImportError as e:
+                print(f"MediaPipe导入失败: {e}; 切换到模拟模式")
                 self.backend = "mock"
         
         if self.backend == "mock":
