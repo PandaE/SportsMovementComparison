@@ -26,7 +26,7 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
         self.comparison_result = comparison_result
         self.user_video_path = user_video_path
         self.standard_video_path = standard_video_path
-        self.is_experimental = comparison_result.get('analysis_type') == 'experimental'
+        # Always treat as advanced/experimental mode
         # Detect new evaluation presence
         self.new_evaluation = comparison_result.get('new_evaluation')
         
@@ -37,13 +37,10 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
     def init_ui(self):
         """初始化界面"""
         layout = QVBoxLayout()
-        
-        # 整体得分显示
+        # 得分区域
         self.create_score_section(layout)
-        
-        # 创建标签页
+        # 标签页（视频 + 合并阶段）
         self.create_tab_widget(layout)
-        
         self.setLayout(layout)
 
     def update_ui_texts(self):
@@ -55,26 +52,25 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
             score = self.comparison_result.get('score', 0)
             self.score_label.setText(f"{self.translate(TK.UI.RESULTS.SCORE)}: {score}")
         
-        if hasattr(self, 'detail_label') and (self.is_experimental or self.new_evaluation):
+        if hasattr(self, 'detail_label'):
             if self.new_evaluation:
                 new_score = self.new_evaluation.get('overall_score')
-                if new_score is not None:
+                if isinstance(new_score, (int, float)):
                     self.detail_label.setText(f"Eval Score: {new_score:.2f}")
                 else:
                     self.detail_label.setText("Eval Score: N/A")
             else:
                 detailed_score = self.comparison_result.get('detailed_score', 0)
-                self.detail_label.setText(f"{self.translate(TK.UI.RESULTS.DETAILED_SCORE)}: {detailed_score:.2%}")
+                try:
+                    self.detail_label.setText(f"{self.translate(TK.UI.RESULTS.DETAILED_SCORE)}: {detailed_score:.2%}")
+                except Exception:
+                    self.detail_label.setText(f"{self.translate(TK.UI.RESULTS.DETAILED_SCORE)}: {detailed_score}")
         
-        # 更新标签页标题
-        if hasattr(self, 'tab_widget'):
+        # 更新标签页标题（合并后仅两个标签）
+        if hasattr(self, 'tab_widget') and self.tab_widget.count() >= 2:
             self.tab_widget.setTabText(0, self.translate(TK.UI.RESULTS.VIDEO_TAB))
-            self.tab_widget.setTabText(1, self.translate(TK.UI.RESULTS.ANALYSIS_TAB))
-            if self.is_experimental:
-                if self.tab_widget.count() > 2:
-                    self.tab_widget.setTabText(2, self.translate(TK.UI.RESULTS.DETAILED_TAB))
-                if self.tab_widget.count() > 3:
-                    self.tab_widget.setTabText(3, self.translate(TK.UI.RESULTS.POSE_TAB))
+            combined_key = getattr(TK.UI.RESULTS, 'COMBINED_STAGE_TAB', TK.UI.RESULTS.ANALYSIS_TAB)
+            self.tab_widget.setTabText(1, self.translate(combined_key))
         
         # 更新视频标题
         if hasattr(self, 'user_title'):
@@ -128,11 +124,10 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
         self.score_label.setStyleSheet('font-size: 28px; font-weight: bold; color: #4169e1;')
         score_layout.addWidget(self.score_label)
 
-        # 如果是实验结果，显示更详细信息
-        if self.is_experimental:
-            self.detail_label = QLabel()
-            self.detail_label.setStyleSheet('font-size: 16px; color: #666;')
-            score_layout.addWidget(self.detail_label)
+        # 总是显示详细信息标签（用于详细得分或新评价得分）
+        self.detail_label = QLabel()
+        self.detail_label.setStyleSheet('font-size: 16px; color: #666;')
+        score_layout.addWidget(self.detail_label)
 
         score_frame.setLayout(score_layout)
         layout.addWidget(score_frame)
@@ -140,18 +135,8 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
     def create_tab_widget(self, layout):
         """创建标签页组件"""
         self.tab_widget = QTabWidget()
-
-        # 视频对比标签页
         self.create_video_tab(self.tab_widget)
-
-        # 动作分析标签页
-        self.create_analysis_tab(self.tab_widget)
-
-        # 如果是实验结果，添加详细测量标签页
-        if self.is_experimental:
-            self.create_detailed_measurements_tab(self.tab_widget)
-            self.create_pose_visualization_tab(self.tab_widget)
-
+        self.create_combined_stage_tab(self.tab_widget)
         layout.addWidget(self.tab_widget)
     
     def create_video_tab(self, tab_widget):
@@ -186,6 +171,136 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
 
         video_widget.setLayout(video_layout)
         tab_widget.addTab(video_widget, "")  # 标题将在update_ui_texts中设置
+
+    def create_combined_stage_tab(self, tab_widget):
+        """创建合并的阶段分析/详细测量/姿态可视化标签页"""
+        combined_widget = QWidget()
+        main_layout = QVBoxLayout()
+
+        # 聚合阶段数据
+        movements = []
+        legacy_movements = self.comparison_result.get('key_movements', []) or []
+        movements.extend(legacy_movements)
+
+        if self.new_evaluation:
+            overall_summary = self.new_evaluation.get('summary')
+            if overall_summary:
+                movements.insert(0, {
+                    'name': 'Evaluation Summary',
+                    'summary': overall_summary,
+                    'suggestion': overall_summary,
+                    'score': self.new_evaluation.get('overall_score', 0),
+                    'evaluation_summary': True
+                })
+            existing_names = {m.get('name') for m in legacy_movements}
+            for st in self.new_evaluation.get('stages', []):
+                stage_name = st.get('name')
+                if stage_name in existing_names:
+                    for mv in movements:
+                        if mv.get('name') == stage_name:
+                            mv.setdefault('evaluation_measurements', st.get('measurements', []))
+                            mv.setdefault('score', st.get('score'))
+                            break
+                    continue
+                measurements = st.get('measurements', [])
+                fails = [m for m in measurements if m.get('passed') is False]
+                if fails:
+                    fail_feedback = [m.get('feedback') for m in fails if m.get('feedback')]
+                    if not fail_feedback:
+                        fail_feedback = [f"{len(fails)} measurements need improvement"]
+                    suggestion_text = ' | '.join(fail_feedback[:2])
+                else:
+                    suggestion_text = 'All measurements acceptable'
+                movements.append({
+                    'name': stage_name,
+                    'summary': f"Stage Score: {st.get('score', 0):.2f}",
+                    'suggestion': suggestion_text,
+                    'score': st.get('score', 0),
+                    'evaluation_measurements': measurements
+                })
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        content = QWidget()
+        content_layout = QVBoxLayout()
+
+        for movement in movements:
+            box = QGroupBox(movement.get('name', 'Stage'))
+            box_layout = QVBoxLayout()
+
+            # 姿态图像
+            user_img = movement.get('user_image')
+            std_img = movement.get('standard_image')
+            if user_img or std_img:
+                img_row = QHBoxLayout()
+                if user_img and os.path.exists(user_img):
+                    lbl_u = QLabel()
+                    pm = QPixmap(user_img)
+                    if not pm.isNull():
+                        lbl_u.setPixmap(pm.scaled(260, 260, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                    lbl_u.setAlignment(Qt.AlignCenter)
+                    lbl_u.setToolTip(self.translate(TK.UI.RESULTS.USER_POSE))
+                    img_row.addWidget(lbl_u)
+                if std_img and os.path.exists(std_img):
+                    lbl_s = QLabel()
+                    pm2 = QPixmap(std_img)
+                    if not pm2.isNull():
+                        lbl_s.setPixmap(pm2.scaled(260, 260, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                    lbl_s.setAlignment(Qt.AlignCenter)
+                    lbl_s.setToolTip(self.translate(TK.UI.RESULTS.STANDARD_POSE))
+                    img_row.addWidget(lbl_s)
+                box_layout.addLayout(img_row)
+
+            # 文本详情
+            text_lines = []
+            if movement.get('evaluation_summary'):
+                text_lines.append(movement.get('summary', ''))
+            else:
+                text_lines.append(f"{self.translate(TK.UI.RESULTS.ANALYSIS_RESULT)}: {movement.get('summary','')}")
+                text_lines.append(f"{self.translate(TK.UI.RESULTS.SUGGESTION)}: {movement.get('suggestion','')}")
+
+            if 'evaluation_measurements' in movement:
+                text_lines.append(f"\n{self.translate(TK.UI.RESULTS.DETAILED_MEASUREMENTS)}:")
+                for m in movement['evaluation_measurements']:
+                    key = m.get('key')
+                    val = m.get('value')
+                    score = m.get('score')
+                    passed = m.get('passed')
+                    feedback = m.get('feedback')
+                    icon = '✅' if passed else '❌'
+                    val_txt = f"{val:.2f}" if isinstance(val, (int, float)) else str(val)
+                    score_txt = f"{score:.0%}" if isinstance(score, (int, float)) else 'N/A'
+                    feedback_txt = f" - {feedback}" if feedback else ''
+                    text_lines.append(f"  {icon} {key}: {val_txt} ({score_txt}){feedback_txt}")
+
+            if 'detailed_measurements' in movement and 'evaluation_measurements' not in movement:
+                text_lines.append(f"\n{self.translate(TK.UI.RESULTS.DETAILED_MEASUREMENTS)}:")
+                for dm in movement['detailed_measurements']:
+                    text_lines.append(f"  {dm}")
+
+            detail_label = QLabel("\n".join(text_lines))
+            detail_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+            detail_label.setWordWrap(True)
+            box_layout.addWidget(detail_label)
+
+            if 'score' in movement and isinstance(movement['score'], (int, float)):
+                sc = movement['score']
+                if sc >= 0.8:
+                    box.setStyleSheet("QGroupBox { border:1px solid #4caf50; margin-top:6px; } QGroupBox::title{ color:#2e7d32; }")
+                elif sc >= 0.6:
+                    box.setStyleSheet("QGroupBox { border:1px solid #ffb300; margin-top:6px; } QGroupBox::title{ color:#ff6f00; }")
+                else:
+                    box.setStyleSheet("QGroupBox { border:1px solid #d32f2f; margin-top:6px; } QGroupBox::title{ color:#b71c1c; }")
+
+            box.setLayout(box_layout)
+            content_layout.addWidget(box)
+
+        content_layout.addStretch()
+        content.setLayout(content_layout)
+        scroll.setWidget(content)
+        main_layout.addWidget(scroll)
+        combined_widget.setLayout(main_layout)
+        tab_widget.addTab(combined_widget, "")
     
     def create_analysis_tab(self, tab_widget):
         """创建动作分析标签页"""
@@ -287,16 +402,16 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
                 feedback_txt = f" - {feedback}" if feedback else ''
                 display_text += f"\n  {icon} {key}: {val_txt}  ({score_txt}){feedback_txt}"
 
-        # 旧实验详细测量（保留原逻辑）
-        if self.is_experimental and 'detailed_measurements' in movement and 'evaluation_measurements' not in movement:
+        # 旧详细测量（条件保留：没有新 evaluation_measurements 才显示）
+        if 'detailed_measurements' in movement and 'evaluation_measurements' not in movement:
             display_text += f"\n\n{self.translate(TK.UI.RESULTS.DETAILED_MEASUREMENTS)}:"
             for measurement in movement['detailed_measurements']:
                 display_text += f"\n{measurement}"
         
         item.setText(display_text)
-        
+
         # 根据得分设置颜色
-        if (self.is_experimental or 'evaluation_measurements' in movement or movement.get('evaluation_summary')) and 'score' in movement:
+        if ('evaluation_measurements' in movement or movement.get('evaluation_summary') or 'score' in movement) and 'score' in movement:
             score = movement['score']
             if score >= 0.8:
                 item.setBackground(Qt.green)
@@ -419,7 +534,7 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
         # 基本信息
         info_lines.append(f"{self.translate(TK.UI.RESULTS.SPORT_TYPE)}: {self.comparison_result.get('sport', self.translate(TK.UI.RESULTS.UNKNOWN))}")
         info_lines.append(f"{self.translate(TK.UI.RESULTS.ACTION_TYPE)}: {self.comparison_result.get('action', self.translate(TK.UI.RESULTS.UNKNOWN))}")
-        analysis_type = self.translate(TK.UI.RESULTS.ADVANCED_ANALYSIS) if self.is_experimental else self.translate(TK.UI.RESULTS.BASIC_ANALYSIS)
+        analysis_type = self.translate(TK.UI.RESULTS.ADVANCED_ANALYSIS)
         info_lines.append(f"{self.translate(TK.UI.RESULTS.ANALYSIS_TYPE)}: {analysis_type}")
         
         # 对比信息
@@ -438,8 +553,7 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
         score = self.comparison_result.get('score', 0)
         detailed_score = self.comparison_result.get('detailed_score', 0)
         info_lines.append(f"{self.translate(TK.UI.RESULTS.OVERALL_SCORE)}: {score}/100")
-        if self.is_experimental:
-            info_lines.append(f"{self.translate(TK.UI.RESULTS.DETAILED_SCORE)}: {detailed_score:.2%}")
+        info_lines.append(f"{self.translate(TK.UI.RESULTS.DETAILED_SCORE)}: {detailed_score:.2%}")
         info_lines.append("")
         
         # 各阶段分析
@@ -448,7 +562,7 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
             info_lines.append(f"{self.translate(TK.UI.RESULTS.ANALYSIS_RESULT)}: {movement['summary']}")
             info_lines.append(f"{self.translate(TK.UI.RESULTS.SUGGESTION)}: {movement['suggestion']}")
             
-            if self.is_experimental and 'score' in movement:
+            if 'score' in movement:
                 info_lines.append(f"{self.translate(TK.UI.RESULTS.STAGE_SCORE)}: {movement['score']:.2%}")
             
             # 核心对比数据
@@ -463,5 +577,27 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
         if 'error' in self.comparison_result:
             info_lines.append(f"=== {self.translate(TK.UI.RESULTS.ERROR_INFO)} ===")
             info_lines.append(self.comparison_result['error'])
+
+        # 新评价模块输出
+        if self.new_evaluation:
+            info_lines.append("")
+            info_lines.append("=== New Evaluation Summary ===")
+            ov_score = self.new_evaluation.get('overall_score')
+            if isinstance(ov_score, (int, float)):
+                info_lines.append(f"Overall Eval Score: {ov_score:.2f}")
+            info_lines.append(f"Summary: {self.new_evaluation.get('summary','')}")
+            for i, st in enumerate(self.new_evaluation.get('stages', []), 1):
+                info_lines.append(f"--- Eval Stage {i}: {st.get('name')} ({st.get('score',0):.2f}) ---")
+                for mv in st.get('measurements', []):
+                    key = mv.get('key')
+                    val = mv.get('value')
+                    score = mv.get('score')
+                    passed = mv.get('passed')
+                    feedback = mv.get('feedback')
+                    icon = 'OK' if passed else 'NG'
+                    val_txt = f"{val:.2f}" if isinstance(val, (int, float)) else str(val)
+                    score_txt = f"{score:.0%}" if isinstance(score, (int, float)) else 'N/A'
+                    feedback_txt = f" | {feedback}" if feedback else ''
+                    info_lines.append(f"  {icon} {key}: {val_txt} ({score_txt}){feedback_txt}")
         
         return "\n".join(info_lines)

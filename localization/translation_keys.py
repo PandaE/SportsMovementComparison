@@ -112,6 +112,9 @@ class TranslationKeys:
             STAGE_SCORE = "ui.results.stage_score"
             ERROR_INFO = "ui.results.error_info"
             UNKNOWN = "ui.results.unknown"
+
+        # Backward compatibility alias (some code references TK.UI.RESULTS.*)
+        RESULTS = Results
         
         class Dialogs:
             SELECT_VIDEO = "ui.dialogs.select_video"
