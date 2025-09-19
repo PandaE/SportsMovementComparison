@@ -1,6 +1,7 @@
 """
-results_window.py
-Enhanced results display window for comparison results with experimental features support.
+results_window.py (DEPRECATED)
+Legacy results display window. Use EnhancedResultsWindow instead.
+Will be removed after full migration & test updates.
 """
 import os
 from PyQt5.QtWidgets import (

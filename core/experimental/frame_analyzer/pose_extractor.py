@@ -34,8 +34,8 @@ class PoseExtractor:
                 )
                 self.mp_drawing = mp.solutions.drawing_utils
                 print("MediaPipe姿态检测器初始化成功")
-            except ImportError:
-                print("MediaPipe未安装，切换到模拟模式")
+            except ImportError as e:
+                print(f"MediaPipe导入失败: {e}; 切换到模拟模式")
                 self.backend = "mock"
         
         if self.backend == "mock":
@@ -132,8 +132,19 @@ class PoseExtractor:
         
         return mock_pose
     
-    def visualize_pose(self, image: np.ndarray, pose: BodyPose, color: tuple = (0, 255, 0)) -> np.ndarray:
-        """在图像上可视化姿态"""
+    def visualize_pose(self, image: np.ndarray, pose: BodyPose, color: tuple = (0, 255, 0),
+                        point_radius: int = 6, line_thickness: int = 3,
+                        show_labels: bool = False) -> np.ndarray:
+        """在图像上可视化姿态 (支持线宽/点大小)
+
+        Args:
+            image: 原始BGR图像
+            pose: BodyPose
+            color: 线条/点颜色 (B,G,R)
+            point_radius: 关键点半径
+            line_thickness: 连线粗细
+            show_labels: 是否显示简短标签
+        """
         vis_image = image.copy()
         
         # 绘制关键点
@@ -156,9 +167,10 @@ class PoseExtractor:
         # 绘制点
         for name, keypoint in keypoints:
             if keypoint:
-                cv2.circle(vis_image, (int(keypoint.x), int(keypoint.y)), 5, color, -1)
-                cv2.putText(vis_image, name[:4], (int(keypoint.x), int(keypoint.y-10)), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 255, 255), 1)
+                cv2.circle(vis_image, (int(keypoint.x), int(keypoint.y)), point_radius, color, -1)
+                if show_labels:
+                    cv2.putText(vis_image, name[:4], (int(keypoint.x), int(keypoint.y-10)), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
         
         # 绘制连接线
         connections = [
@@ -179,6 +191,6 @@ class PoseExtractor:
         for pt1, pt2 in connections:
             if pt1 and pt2:
                 cv2.line(vis_image, (int(pt1.x), int(pt1.y)), (int(pt2.x), int(pt2.y)), 
-                        color, 2)
+                         color, line_thickness, lineType=cv2.LINE_AA)
         
         return vis_image
