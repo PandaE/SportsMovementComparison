@@ -1,4 +1,5 @@
 core/azure_blob_settings.ini
+core/evaluation/llm_settings.ini
 # Python
 __pycache__/
 *.py[cod]

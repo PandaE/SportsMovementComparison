@@ -12,7 +12,6 @@ from PyQt5.QtCore import Qt
 from ui.enhanced_video_player import EnhancedVideoPlayer
 from ui.enhanced_dialogs import EnhancedDialogs
 from ui.enhanced_results_window import EnhancedResultsWindow
-from ui.enhanced_advanced_analysis_window import EnhancedAdvancedAnalysisWindow
 from ui.enhanced_settings_dialog import EnhancedSettingsDialog
 from ui.i18n_mixin import I18nMixin
 from core.comparison_engine import ComparisonEngine
@@ -71,11 +70,7 @@ class EnhancedMainWindow(QWidget, I18nMixin):
         self.settings_group = QGroupBox()
         settings_layout = QFormLayout()
         
-        # 实验功能开关
-        self.experimental_checkbox = QCheckBox()
-        self.experimental_checkbox.setChecked(True)
-        self.experimental_checkbox.stateChanged.connect(self.toggle_experimental_mode)
-        settings_layout.addRow(self.experimental_checkbox)
+    # (已移除实验功能开关，默认高级模式)
         
         # Sport and action selection
         selection_layout = QHBoxLayout()
@@ -141,7 +136,7 @@ class EnhancedMainWindow(QWidget, I18nMixin):
         
         # 分析设置组
         self.settings_group.setTitle(self.translate(TK.UI.MainWindow.ANALYSIS_GROUP))
-        self.experimental_checkbox.setText(self.translate(TK.UI.MainWindow.EXPERIMENTAL_MODE))
+    # 实验模式标签移除
         
         # 标签
         self.sport_label.setText(self.translate(TK.UI.MainWindow.SPORT_LABEL))
@@ -168,22 +163,9 @@ class EnhancedMainWindow(QWidget, I18nMixin):
 
     def update_compare_button_text(self):
         """更新对比按钮文本"""
-        if self.experimental_checkbox.isChecked():
-            self.compare_btn.setText(self.translate(TK.UI.MainWindow.COMPARE_ADVANCED))
-        else:
-            self.compare_btn.setText(self.translate(TK.UI.MainWindow.COMPARE_BASIC))
+        self.compare_btn.setText(self.translate(TK.UI.MainWindow.COMPARE_ADVANCED))
 
-    def toggle_experimental_mode(self, state):
-        """切换实验模式"""
-        use_experimental = state == 2  # Qt.Checked
-        if hasattr(self.experimental_engine, 'set_experimental_mode'):
-            self.experimental_engine.set_experimental_mode(use_experimental)
-        
-        self.current_engine = self.experimental_engine if use_experimental else self.basic_engine
-        self.update_action_combo()  # 更新可用动作列表
-        
-        # 更新按钮文本
-        self.update_compare_button_text()
+    # toggle_experimental_mode 已废弃
     
     def update_action_combo(self):
         """更新动作下拉列表"""
@@ -273,10 +255,7 @@ class EnhancedMainWindow(QWidget, I18nMixin):
 
     def check_compare_ready(self):
         """检查是否可以开始对比"""
-        if self.user_video_path and self.standard_video_path:
-            self.compare_btn.setEnabled(True)
-        else:
-            self.compare_btn.setEnabled(False)
+        self.compare_btn.setEnabled(bool(self.user_video_path and self.standard_video_path))
 
     def compare_videos(self):
         """对比视频"""
@@ -285,38 +264,31 @@ class EnhancedMainWindow(QWidget, I18nMixin):
         
         try:
             # 根据当前引擎类型进行分析
-            if self.current_engine == self.experimental_engine and hasattr(self.current_engine, 'compare'):
-                # 使用实验引擎，传递运动和动作类型
-                sport_display = self.sport_combo.currentText()
-                action_display = self.action_combo.currentText()
-                
-                # 映射显示文本到内部参数
-                sport = self.sport_mapping.get(sport_display, 'badminton')
-                action = self.action_mapping.get(action_display, 'clear')
-                
-                result = self.current_engine.compare(
-                    self.user_video_path, 
-                    self.standard_video_path, 
-                    sport=sport, 
+            # 始终使用实验引擎；若失败会在异常中捕获
+            sport_display = self.sport_combo.currentText()
+            action_display = self.action_combo.currentText()
+            sport = self.sport_mapping.get(sport_display, 'badminton')
+            action = self.action_mapping.get(action_display, 'clear')
+            try:
+                result = self.experimental_engine.compare(
+                    self.user_video_path,
+                    self.standard_video_path,
+                    sport=sport,
                     action=action
                 )
-                # 如果启用了高级分析，使用高级分析窗口
-                if self.experimental_checkbox.isChecked():
-                    self.results_window = EnhancedAdvancedAnalysisWindow(
-                        result, 
-                        self.user_video_path, 
-                        self.standard_video_path
-                    )
-                else:
-                    self.results_window = EnhancedResultsWindow(
-                        result, 
-                        self.user_video_path, 
-                        self.standard_video_path
-                    )
-            else:
-                # 使用基础引擎
-                result = self.current_engine.compare(self.user_video_path, self.standard_video_path)
-                self.results_window = EnhancedResultsWindow(result, self.user_video_path, self.standard_video_path)
+                # 如果结果包含错误则尝试回退
+                if isinstance(result, dict) and result.get('error'):
+                    print("高级分析返回错误，回退基础模式: ", result.get('error'))
+                    result = self.basic_engine.compare(self.user_video_path, self.standard_video_path)
+            except Exception as exp_err:
+                print(f"高级分析异常，回退基础模式: {exp_err}")
+                result = self.basic_engine.compare(self.user_video_path, self.standard_video_path)
+
+            self.results_window = EnhancedResultsWindow(
+                result,
+                self.user_video_path,
+                self.standard_video_path
+            )
             
             self.results_window.show()
             
@@ -334,8 +306,7 @@ class EnhancedMainWindow(QWidget, I18nMixin):
     def apply_settings(self, settings):
         """应用设置变更"""
         # 更新实验模式状态
-        self.experimental_checkbox.setChecked(settings.get('experimental_enabled', True))
-        self.toggle_experimental_mode(2 if settings.get('experimental_enabled', True) else 0)
+    # 实验模式相关设置忽略（已默认高级）
 
         # 语言切换由I18nManager自动处理，这里不需要手动设置
         # 因为设置对话框已经直接调用了i18n.set_language()

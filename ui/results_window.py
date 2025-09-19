@@ -57,7 +57,7 @@ class ResultsWindow(QWidget):
         }
         self.setWindowTitle(self.tr_text('title'))
         self.setGeometry(150, 150, 1400, 900)
-        self.is_experimental = comparison_result.get('analysis_type') == 'experimental'
+    # Always treat as advanced mode (legacy flag removed)
         self.init_ui()
 
     def tr_text(self, key):
@@ -94,12 +94,10 @@ class ResultsWindow(QWidget):
         score_label.setStyleSheet('font-size: 28px; font-weight: bold; color: #4169e1;')
         score_layout.addWidget(score_label)
 
-        # 如果是实验结果，显示更详细信息
-        if self.is_experimental:
-            detailed_score = self.comparison_result.get('detailed_score', 0)
-            detail_label = QLabel(f"{self.tr_text('detailed_score')}: {detailed_score:.2%}")
-            detail_label.setStyleSheet('font-size: 16px; color: #666;')
-            score_layout.addWidget(detail_label)
+        detailed_score = self.comparison_result.get('detailed_score', 0)
+        detail_label = QLabel(f"{self.tr_text('detailed_score')}: {detailed_score:.2%}")
+        detail_label.setStyleSheet('font-size: 16px; color: #666;')
+        score_layout.addWidget(detail_label)
 
         score_frame.setLayout(score_layout)
         layout.addWidget(score_frame)
@@ -114,10 +112,9 @@ class ResultsWindow(QWidget):
         # 动作分析标签页
         self.create_analysis_tab(self.tab_widget)
 
-        # 如果是实验结果，添加详细测量标签页
-        if self.is_experimental:
-            self.create_detailed_measurements_tab(self.tab_widget)
-            self.create_pose_visualization_tab(self.tab_widget)
+        # Always add advanced tabs
+        self.create_detailed_measurements_tab(self.tab_widget)
+        self.create_pose_visualization_tab(self.tab_widget)
 
         layout.addWidget(self.tab_widget)
     
@@ -184,22 +181,19 @@ class ResultsWindow(QWidget):
     def add_movement_item(self, movement):
         """添加动作项目"""
         item = QListWidgetItem()
-        
-        # 构建显示文本
+
         display_text = f"【{movement['name']}】\n"
         display_text += f"分析结果: {movement['summary']}\n"
         display_text += f"改进建议: {movement['suggestion']}"
-        
-        # 如果是实验结果，添加更多详细信息
-        if self.is_experimental and 'detailed_measurements' in movement:
+
+        if 'detailed_measurements' in movement:
             display_text += "\n\n详细测量:"
             for measurement in movement['detailed_measurements']:
                 display_text += f"\n{measurement}"
-        
+
         item.setText(display_text)
-        
-        # 根据得分设置颜色
-        if self.is_experimental and 'score' in movement:
+
+        if 'score' in movement:
             score = movement['score']
             if score >= 0.8:
                 item.setBackground(Qt.green)
@@ -209,7 +203,7 @@ class ResultsWindow(QWidget):
             else:
                 item.setBackground(Qt.red)
                 item.setForeground(Qt.white)
-        
+
         self.movements_list.addItem(item)
     
     def create_detailed_measurements_tab(self, tab_widget):
@@ -320,11 +314,10 @@ class ResultsWindow(QWidget):
         """构建详细测量信息文本"""
         info_lines = []
         info_lines.append("=== 对比分析报告 ===\n")
-        
-        # 基本信息
+
         info_lines.append(f"运动类型: {self.comparison_result.get('sport', '未知')}")
         info_lines.append(f"动作类型: {self.comparison_result.get('action', '未知')}")
-        info_lines.append(f"分析类型: {'高级姿态分析' if self.is_experimental else '基础分析'}")
+        info_lines.append("分析类型: 高级姿态分析")
         
         # 对比信息
         if 'comparison_info' in self.comparison_result:
@@ -342,8 +335,7 @@ class ResultsWindow(QWidget):
         score = self.comparison_result.get('score', 0)
         detailed_score = self.comparison_result.get('detailed_score', 0)
         info_lines.append(f"综合得分: {score}/100")
-        if self.is_experimental:
-            info_lines.append(f"详细得分: {detailed_score:.2%}")
+        info_lines.append(f"详细得分: {detailed_score:.2%}")
         info_lines.append("")
         
         # 各阶段分析
@@ -352,7 +344,7 @@ class ResultsWindow(QWidget):
             info_lines.append(f"分析结果: {movement['summary']}")
             info_lines.append(f"改进建议: {movement['suggestion']}")
             
-            if self.is_experimental and 'score' in movement:
+            if 'score' in movement:
                 info_lines.append(f"阶段得分: {movement['score']:.2%}")
             
             # 核心对比数据

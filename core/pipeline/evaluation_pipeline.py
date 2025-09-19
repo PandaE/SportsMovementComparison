@@ -11,6 +11,7 @@ from core.evaluation import (
     ActionEvaluationConfig, StageRule, MeasurementRule,
     evaluate_action, evaluate_action_incremental
 )
+from core.evaluation.llm_config import load_llm_config
 
 
 def action_metrics_to_eval_dict(result: ActionMetricsResult) -> Dict[str, Dict[str, Dict[str, float]]]:
@@ -47,7 +48,16 @@ def build_default_evaluation_config(action_config: ActionConfig, language: str =
                 score_strategy='linear'
             ))
         stages_rules.append(StageRule(name=st.name, measurements=ms, weight=st.weight, description={'zh_CN': st.description, 'en_US': st.description}))
-    return ActionEvaluationConfig(action_name=action_config.name, stages=stages_rules, language=language, enable_scoring=True, enable_llm_refine=False)
+    llm_cfg = load_llm_config()
+    # If user config language is auto it will be resolved during refine; we still pass original evaluation language.
+    return ActionEvaluationConfig(
+        action_name=action_config.name,
+        stages=stages_rules,
+        language=language,
+        enable_scoring=True,
+        enable_llm_refine=llm_cfg.enabled,
+        llm_style=llm_cfg.style
+    )
 
 
 def run_action_evaluation(action_config: ActionConfig, stage_pose_map: Dict[str, Tuple[BodyPose, int]], language: str = 'zh_CN', engine: Optional[MetricsEngine] = None) -> tuple:

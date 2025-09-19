@@ -7,3 +7,5 @@ numpy>=1.19
 mediapipe>=0.10
 # For video playback alternatives (optional)
 python-vlc>=3.0
+# Optional for Azure OpenAI provider (uncomment if you enable azure LLM calls)
+# azure-ai-openai>=1.0.0b8

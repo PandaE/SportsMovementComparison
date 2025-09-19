@@ -82,6 +82,7 @@ class TranslationKeys:
             DETAILED_SCORE = "ui.results.detailed_score"
             VIDEO_TAB = "ui.results.video_tab"
             ANALYSIS_TAB = "ui.results.analysis_tab"
+            COMBINED_STAGE_TAB = "ui.results.combined_stage_tab"
             DETAILED_TAB = "ui.results.detailed_tab"
             POSE_TAB = "ui.results.pose_tab"
             USER_VIDEO = "ui.results.user_video"
@@ -94,6 +95,20 @@ class TranslationKeys:
             STANDARD_POSE = "ui.results.standard_pose"
             ANALYSIS_RESULT = "ui.results.analysis_result"
             SUGGESTION = "ui.results.suggestion"
+            EVAL_SUMMARY = "ui.results.eval_summary"
+            EVAL_STAGE_SCORE = "ui.results.eval_stage_score"
+            EVAL_OVERALL_SCORE = "ui.results.eval_overall_score"
+            EVAL_MEAS_OK = "ui.results.eval_measure_ok"
+            EVAL_MEAS_FAIL = "ui.results.eval_measure_fail"
+            EVAL_ALL_ACCEPTABLE = "ui.results.eval_all_acceptable"
+            EVAL_NEEDS_IMPROVEMENT = "ui.results.eval_needs_improvement"
+            # Frame editing
+            EDIT_FRAMES = "ui.results.edit_frames"
+            USER_FRAME_IDX = "ui.results.user_frame_idx"
+            STANDARD_FRAME_IDX = "ui.results.standard_frame_idx"
+            APPLY_CHANGES = "ui.results.apply_changes"
+            RERUN_ANALYSIS = "ui.results.rerun_analysis"
+            FRAME_OVERRIDE_MODE = "ui.results.frame_override_mode"
             
             # Report text
             COMPARISON_REPORT = "ui.results.comparison_report"
@@ -112,6 +127,10 @@ class TranslationKeys:
             STAGE_SCORE = "ui.results.stage_score"
             ERROR_INFO = "ui.results.error_info"
             UNKNOWN = "ui.results.unknown"
+            LLM_REFINED_SUMMARY = "ui.results.llm_refined_summary"
+
+        # Backward compatibility alias (some code references TK.UI.RESULTS.*)
+        RESULTS = Results
         
         class Dialogs:
             SELECT_VIDEO = "ui.dialogs.select_video"

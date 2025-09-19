@@ -11,7 +11,7 @@ from .experimental.frame_analyzer.frame_comparator import FrameComparator
 from .experimental.frame_analyzer.pose_extractor import PoseExtractor
 from .experimental.frame_analyzer.key_frame_extractor import KeyFrameExtractor
 from .experimental.config.sport_configs import SportConfigs
-from .pipeline.evaluation_pipeline import run_action_evaluation
+from .pipeline.evaluation_pipeline import run_action_evaluation, run_action_evaluation_incremental
 
 
 class ExperimentalComparisonEngine(ComparisonEngine):
@@ -41,9 +41,17 @@ class ExperimentalComparisonEngine(ComparisonEngine):
                 self.experimental_ready = False
         else:
             self.experimental_ready = False
+        # 缓存上一次自动/合并后的阶段帧与帧索引，便于手动覆盖时不丢失其他阶段
+        self._cached_user_stage_frames = None
+        self._cached_standard_stage_frames = None
+        self._cached_user_frame_positions = None
+        self._cached_standard_frame_positions = None
+        # 最近一次完整/增量评价对象缓存
+        self._last_evaluation = None
     
     def compare(self, user_video_path: str, standard_video_path: str, 
-                sport: str = "badminton", action: str = "clear") -> Dict:
+                sport: str = "badminton", action: str = "clear",
+                manual_frames: Optional[Dict[str, Dict[str, int]]] = None) -> Dict:
         """
         对比两个视频
         
@@ -57,27 +65,56 @@ class ExperimentalComparisonEngine(ComparisonEngine):
             对比结果字典
         """
         if self.experimental_ready and self.use_experimental:
-            return self._experimental_compare(user_video_path, standard_video_path, sport, action)
+            return self._experimental_compare(user_video_path, standard_video_path, sport, action, manual_frames)
         else:
             # 回退到原有的dummy实现
             return super().compare(user_video_path, standard_video_path)
     
     def _experimental_compare(self, user_video_path: str, standard_video_path: str, 
-                            sport: str, action: str) -> Dict:
+                            sport: str, action: str,
+                            manual_frames: Optional[Dict[str, Dict[str, int]]] = None) -> Dict:
         """实验模块的对比实现"""
         try:
             # 1. 获取运动配置
             config = SportConfigs.get_config(sport, action)
             
-            # 2. 自动提取关键帧
-            print(f"🎯 开始提取关键帧: {sport} - {action}")
-            user_stage_frames = self.key_frame_extractor.extract_stage_images(user_video_path, sport, action)
-            standard_stage_frames = self.key_frame_extractor.extract_stage_images(standard_video_path, sport, action)
+            # 2. 关键帧获取逻辑（支持手动覆盖）
+            if manual_frames:
+                # 不再进行任何自动提取；仅使用用户提供的阶段帧 + 已存在缓存
+                user_stage_frames = dict(self._cached_user_stage_frames) if self._cached_user_stage_frames else {}
+                standard_stage_frames = dict(self._cached_standard_stage_frames) if self._cached_standard_stage_frames else {}
+                cap_user = cv2.VideoCapture(user_video_path)
+                cap_std = cv2.VideoCapture(standard_video_path)
+                override_count = 0
+                for stage_name, vals in manual_frames.items():
+                    if not isinstance(vals, dict):
+                        continue
+                    u_idx = vals.get('user')
+                    s_idx = vals.get('standard')
+                    if u_idx is not None and cap_user.isOpened():
+                        cap_user.set(cv2.CAP_PROP_POS_FRAMES, u_idx)
+                        ret_u, frame_u = cap_user.read()
+                        if ret_u:
+                            user_stage_frames[stage_name] = frame_u
+                            override_count += 1
+                    if s_idx is not None and cap_std.isOpened():
+                        cap_std.set(cv2.CAP_PROP_POS_FRAMES, s_idx)
+                        ret_s, frame_s = cap_std.read()
+                        if ret_s:
+                            standard_stage_frames[stage_name] = frame_s
+                cap_user.release()
+                cap_std.release()
+                print(f"🔁 仅使用手动关键帧 (未触发自动提取). 本次替换 {override_count} 个阶段; 现有阶段: 用户 {len(user_stage_frames)} / 标准 {len(standard_stage_frames)}")
+            else:
+                print(f"🎯 开始提取关键帧: {sport} - {action}")
+                user_stage_frames = self.key_frame_extractor.extract_stage_images(user_video_path, sport, action)
+                standard_stage_frames = self.key_frame_extractor.extract_stage_images(standard_video_path, sport, action)
+                self._cached_user_stage_frames = dict(user_stage_frames)
+                self._cached_standard_stage_frames = dict(standard_stage_frames)
+                print(f"✅ 关键帧提取完成: 用户 {len(user_stage_frames)} / 标准 {len(standard_stage_frames)} 阶段帧 (已缓存)")
             
-            if not user_stage_frames or not standard_stage_frames:
-                return self._create_error_result("无法提取有效的关键帧")
-            
-            print(f"✅ 关键帧提取完成，共提取 {len(user_stage_frames)} 个阶段的帧")
+            if not user_stage_frames and not standard_stage_frames:
+                return self._create_error_result("无法获取任何关键帧 (手动或自动均为空)")
             
             # 3. 执行多阶段对比分析 (旧对比逻辑保留)
             results = []
@@ -99,43 +136,69 @@ class ExperimentalComparisonEngine(ComparisonEngine):
                 else:
                     print(f"   ⚠️  {stage_name}: 缺少关键帧，跳过分析")
             
-            # 4. 生成对比可视化 (使用第一个可用的关键帧对)
-            comparison_images = {}
+            # 4. 生成每阶段姿态可视化 (逐阶段图像)
+            stage_images = {}
             if user_stage_frames and standard_stage_frames:
-                first_stage = list(user_stage_frames.keys())[0]
-                comparison_images = self._generate_comparison_images(
-                    user_stage_frames[first_stage], 
-                    standard_stage_frames[first_stage], 
-                    results
-                )
+                for stage in config.stages:
+                    sname = stage.name
+                    if sname in user_stage_frames and sname in standard_stage_frames:
+                        try:
+                            imgs = self._generate_comparison_images(
+                                user_stage_frames[sname],
+                                standard_stage_frames[sname],
+                                results,
+                                stage_name=sname
+                            )
+                            if imgs:
+                                stage_images[sname] = imgs
+                        except Exception as _e_img:
+                            print(f"阶段图像生成失败 {sname}: {_e_img}")
             
             # 5. 构建兼容的返回格式，包含关键帧信息
             # 获取关键帧位置信息用于传递
-            user_frame_positions = self.key_frame_extractor.extract_stage_frames(user_video_path, sport, action)
-            standard_frame_positions = self.key_frame_extractor.extract_stage_frames(standard_video_path, sport, action)
+            if manual_frames:
+                # 若无缓存帧索引则先获取一次
+                if self._cached_user_frame_positions is None or self._cached_standard_frame_positions is None:
+                    self._cached_user_frame_positions = self.key_frame_extractor.extract_stage_frames(user_video_path, sport, action)
+                    self._cached_standard_frame_positions = self.key_frame_extractor.extract_stage_frames(standard_video_path, sport, action)
+                # 基于缓存复制后叠加手动覆盖
+                user_frame_positions = dict(self._cached_user_frame_positions or {})
+                standard_frame_positions = dict(self._cached_standard_frame_positions or {})
+                for stage_name, vals in manual_frames.items():
+                    if isinstance(vals, dict):
+                        if 'user' in vals and vals.get('user') is not None:
+                            user_frame_positions[stage_name] = vals.get('user')
+                        if 'standard' in vals and vals.get('standard') is not None:
+                            standard_frame_positions[stage_name] = vals.get('standard')
+                # 同步缓存
+                self._cached_user_frame_positions = dict(user_frame_positions)
+                self._cached_standard_frame_positions = dict(standard_frame_positions)
+            else:
+                user_frame_positions = self.key_frame_extractor.extract_stage_frames(user_video_path, sport, action)
+                standard_frame_positions = self.key_frame_extractor.extract_stage_frames(standard_video_path, sport, action)
+                self._cached_user_frame_positions = dict(user_frame_positions)
+                self._cached_standard_frame_positions = dict(standard_frame_positions)
             
             result = self._format_experimental_results(
-                overall_score, results, comparison_images, user_video_path, standard_video_path,
-                user_frame_positions, standard_frame_positions
+                overall_score, results, stage_images, user_video_path, standard_video_path,
+                user_frame_positions, standard_frame_positions, sport=sport, action=action
             )
             
             # 6. 添加关键帧信息到结果中
             result['key_frame_info'] = {
                 'user_frames': user_frame_positions,
                 'standard_frames': standard_frame_positions,
-                'extraction_method': 'intelligent' if self.key_frame_extractor.use_intelligent_extraction else 'time_based',
+                'extraction_method': 'manual' if manual_frames else ('intelligent' if self.key_frame_extractor.use_intelligent_extraction else 'time_based'),
                 'sport': sport,
-                'action': action
+                'action': action,
+                'manual_override': bool(manual_frames)
             }
             
             print(f"🏆 旧对比分析完成，总分: {overall_score:.2f}")
 
             # 7. 新增：基于 Metrics + Evaluation 的统一评分 (仅使用用户视频关键帧，不再与标准逐帧差分)
             try:
-                # 复用已抽取的用户阶段帧作为 pose 计算输入
-                # 仅当用户帧存在时执行
                 if user_stage_frames:
-                    # 提取每阶段 pose（单帧）
                     stage_pose_map = {}
                     for stage in config.stages:
                         if stage.name in user_stage_frames:
@@ -143,27 +206,59 @@ class ExperimentalComparisonEngine(ComparisonEngine):
                             if pose:
                                 stage_pose_map[stage.name] = (pose, 0)
                     if stage_pose_map:
-                        metrics_result, evaluation = run_action_evaluation(config, stage_pose_map, language='zh_CN')
-                        result['new_evaluation'] = {
-                            'overall_score': evaluation.score,
-                            'summary': evaluation.summary,
-                            'stages': [
-                                {
-                                    'name': st.name,
-                                    'score': st.score,
-                                    'measurements': [
-                                        {
-                                            'key': mv.key,
-                                            'value': mv.value,
-                                            'score': mv.score,
-                                            'passed': mv.passed,
-                                            'feedback': mv.feedback,
-                                        } for mv in st.measurements
-                                    ]
-                                } for st in evaluation.stages
-                            ]
-                        }
-                        print("🆕 新评价模块输出完成 (new_evaluation 键)")
+                        use_incremental = bool(manual_frames and self._last_evaluation)
+                        updated_stage_names = []
+                        evaluation = None
+                        if use_incremental:
+                            cached_positions = self._cached_user_frame_positions or {}
+                            for st_name, vals in (manual_frames or {}).items():
+                                if not isinstance(vals, dict):
+                                    continue
+                                u_idx = vals.get('user')
+                                prev_idx = cached_positions.get(st_name)
+                                if prev_idx is None or prev_idx != u_idx:
+                                    updated_stage_names.append(st_name)
+                            if not updated_stage_names:
+                                evaluation = self._last_evaluation
+                            else:
+                                _, evaluation = run_action_evaluation_incremental(
+                                    self._last_evaluation,
+                                    config,
+                                    updated_stage_names,
+                                    stage_pose_map,
+                                    language='zh_CN'
+                                )
+                        else:
+                            _, evaluation = run_action_evaluation(config, stage_pose_map, language='zh_CN')
+                        if evaluation:
+                            result['new_evaluation'] = {
+                                'overall_score': evaluation.score,
+                                'summary': evaluation.summary,
+                                'refined_summary': evaluation.refined_summary,
+                                'stages': [
+                                    {
+                                        'name': st.name,
+                                        'score': st.score,
+                                        'feedback': st.feedback,
+                                        'refined_feedback': getattr(st, 'refined_feedback', None),
+                                        'measurements': [
+                                            {
+                                                'key': mv.key,
+                                                'value': mv.value,
+                                                'score': mv.score,
+                                                'passed': mv.passed,
+                                                'feedback': mv.feedback,
+                                                'refined_feedback': getattr(mv, 'refined_feedback', None),
+                                            } for mv in st.measurements
+                                        ]
+                                    } for st in evaluation.stages
+                                ]
+                            }
+                            if manual_frames and self._last_evaluation and updated_stage_names:
+                                print(f"🆕 增量评价完成: 仅更新阶段 {updated_stage_names}")
+                            else:
+                                print("🆕 新评价模块输出完成 (new_evaluation 键)")
+                            self._last_evaluation = evaluation
             except Exception as ee:
                 print(f"新评价模块执行失败: {ee}")
 
@@ -299,8 +394,11 @@ class ExperimentalComparisonEngine(ComparisonEngine):
                 'error': f'分析错误: {str(e)}'
             }
     
-    def _generate_comparison_images(self, user_frame, standard_frame, results) -> Dict:
-        """生成对比可视化图像"""
+    def _generate_comparison_images(self, user_frame, standard_frame, results, stage_name: str = None) -> Dict:
+        """生成对比可视化图像 (单阶段)
+        Returns dict with keys: user_pose, standard_pose
+        stage_name impacts temp file names to avoid overwrite.
+        """
         comparison_images = {}
         
         try:
@@ -314,8 +412,9 @@ class ExperimentalComparisonEngine(ComparisonEngine):
                 
                 # 保存临时图像
                 temp_dir = tempfile.gettempdir()
-                user_img_path = os.path.join(temp_dir, "user_pose_analysis.jpg")
-                standard_img_path = os.path.join(temp_dir, "standard_pose_analysis.jpg")
+                suffix = f"_{stage_name}" if stage_name else ""
+                user_img_path = os.path.join(temp_dir, f"user_pose_{stage_name or 'analysis'}{suffix}.jpg")
+                standard_img_path = os.path.join(temp_dir, f"standard_pose_{stage_name or 'analysis'}{suffix}.jpg")
                 
                 cv2.imwrite(user_img_path, user_vis)
                 cv2.imwrite(standard_img_path, standard_vis)
@@ -427,9 +526,10 @@ class ExperimentalComparisonEngine(ComparisonEngine):
         return count
     
     def _format_experimental_results(self, overall_score: float, stage_results: List, 
-                                   comparison_images: Dict, user_video_path: str, 
+                                   stage_images: Dict, user_video_path: str, 
                                    standard_video_path: str, user_frame_positions: Dict[str, int] = None,
-                                   standard_frame_positions: Dict[str, int] = None) -> Dict:
+                                   standard_frame_positions: Dict[str, int] = None,
+                                   sport: str = None, action: str = None) -> Dict:
         """格式化结果以兼容原有接口并提供高级分析数据"""
         
         # 构建key_movements列表（兼容原接口）
@@ -503,10 +603,11 @@ class ExperimentalComparisonEngine(ComparisonEngine):
                 'measurements': stage_measurements
             }
             
+            imgs = stage_images.get(stage_name, {}) if isinstance(stage_images, dict) else {}
             key_movements.append({
                 'name': stage_name,
-                'user_image': comparison_images.get('user_pose'),
-                'standard_image': comparison_images.get('standard_pose'),
+                'user_image': imgs.get('user_pose'),
+                'standard_image': imgs.get('standard_pose'),
                 'summary': summary,
                 'suggestion': '; '.join(suggestions) if suggestions else '继续保持',
                 'detailed_measurements': measurement_details,
@@ -519,8 +620,10 @@ class ExperimentalComparisonEngine(ComparisonEngine):
             'detailed_score': overall_score,
             'key_movements': key_movements,
             'analysis_type': 'experimental_with_key_frames',
-            'sport': '羽毛球',
-            'action': '正手高远球',
+            'sport': sport or 'unknown',
+            'action': action or 'unknown',
+            'sport_code': sport,
+            'action_code': action,
             'user_video_path': user_video_path,
             'standard_video_path': standard_video_path,
             'comparison_info': {
@@ -532,7 +635,7 @@ class ExperimentalComparisonEngine(ComparisonEngine):
             },
             # 为高级分析窗口添加阶段数据
             'stages': stages_data,
-            'comparison_images': comparison_images,
+            'comparison_images': stage_images,
             'analysis_summary': {
                 'total_stages': len(stage_results),
                 'avg_score': overall_score * 100,

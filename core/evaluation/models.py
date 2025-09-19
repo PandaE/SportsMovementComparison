@@ -44,6 +44,7 @@ class MeasurementEvaluation:
     score: Optional[float]
     passed: Optional[bool]
     feedback: Optional[str]
+    refined_feedback: Optional[str] = None  # LLM enhanced feedback
 
 @dataclass
 class StageEvaluation:
@@ -51,6 +52,7 @@ class StageEvaluation:
     measurements: List[MeasurementEvaluation]
     score: Optional[float]
     feedback: Optional[str]
+    refined_feedback: Optional[str] = None  # LLM enhanced stage-level feedback
 
 @dataclass
 class ActionEvaluation:
@@ -60,6 +62,7 @@ class ActionEvaluation:
     summary: Optional[str]
     refined_summary: Optional[str] = None
     language: str = "zh_CN"
+    # Flag / metadata could be added later for tracing refinement provenance
 
 # Type alias for metrics input: expecting ActionMetricsResult structure from metrics_engine
 MetricsDict = Dict[str, Dict[str, Dict[str, Any]]]
