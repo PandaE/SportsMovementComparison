@@ -9,13 +9,20 @@ from PyQt5.QtWidgets import (
     QCheckBox, QGroupBox, QFormLayout
 )
 from PyQt5.QtCore import Qt
+import os
 from ui.enhanced_video_player import EnhancedVideoPlayer
 from ui.enhanced_dialogs import EnhancedDialogs
-from ui.enhanced_results_window import EnhancedResultsWindow
+# from ui.enhanced_results_window import EnhancedResultsWindow  # deprecated in new flow
 from ui.enhanced_settings_dialog import EnhancedSettingsDialog
 from ui.i18n_mixin import I18nMixin
 from core.comparison_engine import ComparisonEngine
 from core.experimental_comparison_engine import ExperimentalComparisonEngine
+from core.experimental.frame_analyzer.preset_key_frame_extractor import PresetKeyFrameExtractor
+from core.experimental.frame_analyzer.key_frame_extractor import KeyFrameExtractor
+from core.new_evaluation.data_models import ActionConfig as NEActionConfig, StageConfig as NEStageConfig, MetricConfig as NEMetricConfig, KeyframeSet, FrameRef
+from core.new_evaluation.session import EvaluationSession
+from core.new_evaluation.adapter import UIAdapter
+from ui.new_results.results_window import ResultsWindow as NewResultsWindow
 from localization.translation_keys import TK
 
 
@@ -128,33 +135,6 @@ class EnhancedMainWindow(QWidget, I18nMixin):
         """更新所有UI文本"""
         # 窗口标题
         self.setWindowTitle(self.translate(TK.UI.MainWindow.TITLE))
-        
-        # 按钮文本
-        self.settings_btn.setText(self.translate(TK.UI.MainWindow.SETTINGS))
-        self.import_user_btn.setText(self.translate(TK.UI.MainWindow.IMPORT_USER))
-        self.import_standard_btn.setText(self.translate(TK.UI.MainWindow.IMPORT_STANDARD))
-        
-        # 分析设置组
-        self.settings_group.setTitle(self.translate(TK.UI.MainWindow.ANALYSIS_GROUP))
-    # 实验模式标签移除
-        
-        # 标签
-        self.sport_label.setText(self.translate(TK.UI.MainWindow.SPORT_LABEL))
-        self.action_label.setText(self.translate(TK.UI.MainWindow.ACTION_LABEL))
-        
-        # 更新运动下拉框
-        self.update_sport_combo_texts()
-        
-        # 更新对比按钮文本
-        self.update_compare_button_text()
-        
-        # 通知视频播放器更新语言
-        if hasattr(self.user_video_player, 'update_language'):
-            current_lang = 'zh' if self.get_current_language() == 'zh_CN' else 'en'
-            self.user_video_player.update_language(current_lang)
-            self.standard_video_player.update_language(current_lang)
-
-    def update_sport_combo_texts(self):
         """更新运动下拉框文本"""
         current_index = self.sport_combo.currentIndex()
         self.sport_combo.clear()
@@ -261,42 +241,73 @@ class EnhancedMainWindow(QWidget, I18nMixin):
         """对比视频"""
         # 禁用按钮，防止重复点击
         self.compare_btn.setEnabled(False)
-        
         try:
-            # 根据当前引擎类型进行分析
-            # 始终使用实验引擎；若失败会在异常中捕获
             sport_display = self.sport_combo.currentText()
             action_display = self.action_combo.currentText()
             sport = self.sport_mapping.get(sport_display, 'badminton')
             action = self.action_mapping.get(action_display, 'clear')
-            try:
-                result = self.experimental_engine.compare(
-                    self.user_video_path,
-                    self.standard_video_path,
-                    sport=sport,
-                    action=action
-                )
-                # 如果结果包含错误则尝试回退
-                if isinstance(result, dict) and result.get('error'):
-                    print("高级分析返回错误，回退基础模式: ", result.get('error'))
-                    result = self.basic_engine.compare(self.user_video_path, self.standard_video_path)
-            except Exception as exp_err:
-                print(f"高级分析异常，回退基础模式: {exp_err}")
-                result = self.basic_engine.compare(self.user_video_path, self.standard_video_path)
 
-            self.results_window = EnhancedResultsWindow(
-                result,
-                self.user_video_path,
-                self.standard_video_path
-            )
-            
+            if not (self.user_video_path and self.standard_video_path):
+                print("缺少视频路径，无法开始对比")
+                return
+
+            preset_extractor = getattr(self, '_preset_extractor', None)
+            if preset_extractor is None:
+                preset_extractor = PresetKeyFrameExtractor()
+                self._preset_extractor = preset_extractor
+            key_extractor = getattr(self, '_key_extractor', None)
+            if key_extractor is None:
+                key_extractor = KeyFrameExtractor()
+                self._key_extractor = key_extractor
+
+            def obtain_stage_frames(video_path: str, is_standard: bool):
+                base_name = os.path.basename(video_path) if video_path else None
+                frames = None
+                try:
+                    if preset_extractor.has_preset(sport, action, video_name=base_name):
+                        frames = preset_extractor.extract_stage_frames(video_path, sport, action, video_name=base_name)
+                    elif preset_extractor.has_preset(sport, action):
+                        frames = preset_extractor.extract_stage_frames(video_path, sport, action)
+                except Exception:
+                    frames = None
+                if frames is None:
+                    try:
+                        frames = key_extractor.extract_stage_frames(video_path, sport, action)
+                    except Exception as e:
+                        print(f"自动提取关键帧失败: {e}")
+                        frames = {}
+                return frames or {}
+
+            user_frame_positions = obtain_stage_frames(self.user_video_path, is_standard=False)
+            std_frame_positions = obtain_stage_frames(self.standard_video_path, is_standard=True)
+            if not user_frame_positions:
+                print("未能提取到用户关键帧，终止")
+                return
+
+            stage_keys = sorted(set(list(user_frame_positions.keys()) + list(std_frame_positions.keys())))
+            if not stage_keys:
+                print("没有阶段关键帧，终止")
+                return
+            stages_cfg = []
+            for sk in stage_keys:
+                metric = NEMetricConfig(key=f"{sk}_presence", name=f"{sk}关键帧质量", unit=None, target=1.0)
+                stages_cfg.append(NEStageConfig(key=sk, name=sk, metrics=[metric], weight=1.0/len(stage_keys)))
+            action_cfg = NEActionConfig(sport=sport, action=action, stages=stages_cfg)
+
+            user_refs = {k: FrameRef(video_path=self.user_video_path, frame_index=v) for k, v in user_frame_positions.items()}
+            std_refs = {k: FrameRef(video_path=self.standard_video_path, frame_index=v) for k, v in std_frame_positions.items()}
+            keyframes = KeyframeSet(user=user_refs, standard=std_refs)
+
+            session = EvaluationSession(config=action_cfg, keyframes=keyframes, user_video=self.user_video_path, standard_video=self.standard_video_path)
+            session.evaluate()
+            state = session.get_state()
+            vm = UIAdapter.to_vm(state, keyframes.user, keyframes.standard)
+            self.results_window = NewResultsWindow(vm, session=session, keyframes=keyframes, adapter=UIAdapter)
             self.results_window.show()
-            
         except Exception as e:
-            print(f"分析过程中出现错误: {e}")
-            # 这里可以显示错误对话框
+            print(f"新评估流程失败: {e}")
+            import traceback; traceback.print_exc()
         finally:
-            # 分析结束后重新启用按钮
             self.compare_btn.setEnabled(True)
     
     def open_settings(self):
