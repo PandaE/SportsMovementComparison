@@ -7,7 +7,7 @@ from .models import (
 from .scoring import STRATEGIES, deviation_pass
 from .generator import generate_measurement_feedback, generate_stage_feedback
 from .localization import ACTION_FEEDBACK
-from .llm_refiner import refine_summary
+from .llm_refiner import refine_summary, refine_full_evaluation
 
 
 def _pick_strategy(rule: MeasurementRule, enable_scoring: bool):
@@ -78,10 +78,10 @@ def evaluate_action(metrics: Dict[str, Dict[str, Dict[str, Any]]], config: Actio
     else:
         summary_key = 'overall_poor'
     summary = loc[summary_key].format(action=config.action_name)
-    refined = None
+    evaluation = ActionEvaluation(action_name=config.action_name, stages=stage_evals, score=overall_score, summary=summary, refined_summary=None, language=config.language)
     if config.enable_llm_refine:
-        refined = refine_summary(summary, config.language, config.llm_style)
-    return ActionEvaluation(action_name=config.action_name, stages=stage_evals, score=overall_score, summary=summary, refined_summary=refined, language=config.language)
+        evaluation = refine_full_evaluation(evaluation, config.llm_style)
+    return evaluation
 
 
 def evaluate_action_incremental(previous: Optional[ActionEvaluation], updated_stage_names: Iterable[str], metrics: Dict[str, Dict[str, Dict[str, Any]]], config: ActionEvaluationConfig) -> ActionEvaluation:
@@ -122,9 +122,9 @@ def evaluate_action_incremental(previous: Optional[ActionEvaluation], updated_st
     else:
         summary_key = 'overall_poor'
     summary = loc[summary_key].format(action=config.action_name)
-    refined = None
+    evaluation = ActionEvaluation(action_name=config.action_name, stages=ordered, score=overall_score, summary=summary, refined_summary=None, language=config.language)
     if config.enable_llm_refine:
-        refined = refine_summary(summary, config.language, config.llm_style)
-    return ActionEvaluation(action_name=config.action_name, stages=ordered, score=overall_score, summary=summary, refined_summary=refined, language=config.language)
+        evaluation = refine_full_evaluation(evaluation, config.llm_style)
+    return evaluation
 
 __all__ = ['evaluate_action', 'evaluate_action_incremental']

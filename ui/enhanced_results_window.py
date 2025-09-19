@@ -205,14 +205,15 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
         movements.extend(legacy_movements)
 
         if self.new_evaluation:
-            overall_summary = self.new_evaluation.get('summary')
-            if overall_summary:
+            refined = self.new_evaluation.get('refined_summary') or self.new_evaluation.get('summary')
+            if refined:
                 movements.insert(0, {
                     'name': self.translate(TK.UI.RESULTS.EVAL_SUMMARY),
-                    'summary': overall_summary,
-                    'suggestion': overall_summary,
+                    'summary': refined,
+                    'suggestion': refined,
                     'score': self.new_evaluation.get('overall_score', 0),
-                    'evaluation_summary': True
+                    'evaluation_summary': True,
+                    'is_refined': bool(self.new_evaluation.get('refined_summary'))
                 })
             existing_names = {m.get('name') for m in legacy_movements}
             for st in self.new_evaluation.get('stages', []):
@@ -295,7 +296,10 @@ class EnhancedResultsWindow(QWidget, I18nMixin):
                         text_lines.append(f"{self.translate(TK.UI.RESULTS.EVAL_OVERALL_SCORE)}: {ov:.2f}")
                     except Exception:
                         text_lines.append(f"{self.translate(TK.UI.RESULTS.EVAL_OVERALL_SCORE)}: {ov}")
-                text_lines.append(movement.get('summary', ''))
+                if movement.get('is_refined'):
+                    text_lines.append(f"{self.translate(getattr(TK.UI.RESULTS, 'LLM_REFINED_SUMMARY', TK.UI.RESULTS.EVAL_SUMMARY))}: \n{movement.get('summary','')}")
+                else:
+                    text_lines.append(movement.get('summary', ''))
             else:
                 text_lines.append(f"{self.translate(TK.UI.RESULTS.ANALYSIS_RESULT)}: {movement.get('summary','')}")
                 text_lines.append(f"{self.translate(TK.UI.RESULTS.SUGGESTION)}: {movement.get('suggestion','')}")

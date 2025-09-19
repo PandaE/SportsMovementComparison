@@ -127,6 +127,7 @@ class TranslationKeys:
             STAGE_SCORE = "ui.results.stage_score"
             ERROR_INFO = "ui.results.error_info"
             UNKNOWN = "ui.results.unknown"
+            LLM_REFINED_SUMMARY = "ui.results.llm_refined_summary"
 
         # Backward compatibility alias (some code references TK.UI.RESULTS.*)
         RESULTS = Results

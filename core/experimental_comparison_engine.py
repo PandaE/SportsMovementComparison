@@ -11,7 +11,7 @@ from .experimental.frame_analyzer.frame_comparator import FrameComparator
 from .experimental.frame_analyzer.pose_extractor import PoseExtractor
 from .experimental.frame_analyzer.key_frame_extractor import KeyFrameExtractor
 from .experimental.config.sport_configs import SportConfigs
-from .pipeline.evaluation_pipeline import run_action_evaluation
+from .pipeline.evaluation_pipeline import run_action_evaluation, run_action_evaluation_incremental
 
 
 class ExperimentalComparisonEngine(ComparisonEngine):
@@ -46,6 +46,8 @@ class ExperimentalComparisonEngine(ComparisonEngine):
         self._cached_standard_stage_frames = None
         self._cached_user_frame_positions = None
         self._cached_standard_frame_positions = None
+        # 最近一次完整/增量评价对象缓存
+        self._last_evaluation = None
     
     def compare(self, user_video_path: str, standard_video_path: str, 
                 sport: str = "badminton", action: str = "clear",
@@ -196,10 +198,7 @@ class ExperimentalComparisonEngine(ComparisonEngine):
 
             # 7. 新增：基于 Metrics + Evaluation 的统一评分 (仅使用用户视频关键帧，不再与标准逐帧差分)
             try:
-                # 复用已抽取的用户阶段帧作为 pose 计算输入
-                # 仅当用户帧存在时执行
                 if user_stage_frames:
-                    # 提取每阶段 pose（单帧）
                     stage_pose_map = {}
                     for stage in config.stages:
                         if stage.name in user_stage_frames:
@@ -207,27 +206,59 @@ class ExperimentalComparisonEngine(ComparisonEngine):
                             if pose:
                                 stage_pose_map[stage.name] = (pose, 0)
                     if stage_pose_map:
-                        metrics_result, evaluation = run_action_evaluation(config, stage_pose_map, language='zh_CN')
-                        result['new_evaluation'] = {
-                            'overall_score': evaluation.score,
-                            'summary': evaluation.summary,
-                            'stages': [
-                                {
-                                    'name': st.name,
-                                    'score': st.score,
-                                    'measurements': [
-                                        {
-                                            'key': mv.key,
-                                            'value': mv.value,
-                                            'score': mv.score,
-                                            'passed': mv.passed,
-                                            'feedback': mv.feedback,
-                                        } for mv in st.measurements
-                                    ]
-                                } for st in evaluation.stages
-                            ]
-                        }
-                        print("🆕 新评价模块输出完成 (new_evaluation 键)")
+                        use_incremental = bool(manual_frames and self._last_evaluation)
+                        updated_stage_names = []
+                        evaluation = None
+                        if use_incremental:
+                            cached_positions = self._cached_user_frame_positions or {}
+                            for st_name, vals in (manual_frames or {}).items():
+                                if not isinstance(vals, dict):
+                                    continue
+                                u_idx = vals.get('user')
+                                prev_idx = cached_positions.get(st_name)
+                                if prev_idx is None or prev_idx != u_idx:
+                                    updated_stage_names.append(st_name)
+                            if not updated_stage_names:
+                                evaluation = self._last_evaluation
+                            else:
+                                _, evaluation = run_action_evaluation_incremental(
+                                    self._last_evaluation,
+                                    config,
+                                    updated_stage_names,
+                                    stage_pose_map,
+                                    language='zh_CN'
+                                )
+                        else:
+                            _, evaluation = run_action_evaluation(config, stage_pose_map, language='zh_CN')
+                        if evaluation:
+                            result['new_evaluation'] = {
+                                'overall_score': evaluation.score,
+                                'summary': evaluation.summary,
+                                'refined_summary': evaluation.refined_summary,
+                                'stages': [
+                                    {
+                                        'name': st.name,
+                                        'score': st.score,
+                                        'feedback': st.feedback,
+                                        'refined_feedback': getattr(st, 'refined_feedback', None),
+                                        'measurements': [
+                                            {
+                                                'key': mv.key,
+                                                'value': mv.value,
+                                                'score': mv.score,
+                                                'passed': mv.passed,
+                                                'feedback': mv.feedback,
+                                                'refined_feedback': getattr(mv, 'refined_feedback', None),
+                                            } for mv in st.measurements
+                                        ]
+                                    } for st in evaluation.stages
+                                ]
+                            }
+                            if manual_frames and self._last_evaluation and updated_stage_names:
+                                print(f"🆕 增量评价完成: 仅更新阶段 {updated_stage_names}")
+                            else:
+                                print("🆕 新评价模块输出完成 (new_evaluation 键)")
+                            self._last_evaluation = evaluation
             except Exception as ee:
                 print(f"新评价模块执行失败: {ee}")
 
