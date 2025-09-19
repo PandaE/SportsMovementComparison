@@ -21,26 +21,44 @@ STATUS_FG = {'ok': '#1B8D4B', 'warn': '#C87F00', 'bad': '#B82E24', 'na': '#5B647
 STATUS_SYMBOL = {'ok': '✔', 'warn': '△', 'bad': '✖', 'na': '-'}
 
 class ResultsWindow(QWidget):
-    def __init__(self, vm: ActionEvaluationVM):
+    def __init__(self, vm: ActionEvaluationVM, session=None, keyframes=None, adapter=None):
         super().__init__()
         self.vm = vm
+        self._session = session  # optional EvaluationSession for dynamic recompute
+        self._keyframes = keyframes  # KeyframeSet for updating indices
+        self._adapter = adapter  # UIAdapter to rebuild VM
+        self._pending_indices = {}  # stage_key -> pending user frame index (not yet applied)
         self._user_frame_widgets = []  # store user frame FrameDisplayWidget for global operations
         self._pose_enabled = False
+        self._root_layout = None
+        self._stages_container_layout = None
+        self._stages_scroll = None
+        self._training_widget = None
         self.setWindowTitle('动作分析结果 (简化模型)')
         self.resize(1180, 860)
         self.build_ui()
 
     # --- Build root ------------------------------------------------------
     def build_ui(self):
+        if self._root_layout is not None:
+            # Already built; rebuild dynamic parts only
+            self._rebuild_stages()
+            self._rebuild_training()
+            return
         root = QVBoxLayout(self)
+        self._root_layout = root
         root.setContentsMargins(28, 20, 28, 20)
         root.setSpacing(18)
         root.addLayout(self.build_header())
-        root.addWidget(self.build_stages_scroll(), 1)
+        scroll, layout = self.build_stages_scroll()
+        self._stages_scroll = scroll
+        self._stages_container_layout = layout
+        root.addWidget(scroll, 1)
         # Button row between stage comparison and training guidance
         root.addLayout(self.build_controls_row())
         if self.vm.training:
-            root.addWidget(self.build_training())
+            self._training_widget = self.build_training()
+            root.addWidget(self._training_widget)
 
     # --- Header -----------------------------------------------------------
     def build_header(self):
@@ -87,7 +105,7 @@ class ResultsWindow(QWidget):
             layout.addWidget(self.build_stage_card(s))
         layout.addStretch()
         scroll.setWidget(container)
-        return scroll
+        return scroll, layout
 
     # --- Controls (pose toggle etc.) -----------------------------------
     def build_controls_row(self):
@@ -119,12 +137,14 @@ class ResultsWindow(QWidget):
         title.setStyleSheet(f"font-size:20px; font-weight:600; color:{score_color(stage.score)};")
         header.addWidget(title)
         header.addStretch()
-        header.addWidget(self.small_button('调整帧'))
+        adj_btn = self.small_button('调整帧')
+        adj_btn.clicked.connect(lambda _, sk=stage.key: self._confirm_recompute(sk))
+        header.addWidget(adj_btn)
         lay.addLayout(header)
 
         # Frames (actual display widget w/ caching & optional slider)
         frame_row = QHBoxLayout(); frame_row.setSpacing(16)
-        frame_row.addWidget(self.frame_widget(stage.user_frame, allow_adjust=True, label_text='用户关键帧', collect_user=True), 1)
+        frame_row.addWidget(self.frame_widget(stage.user_frame, allow_adjust=True, label_text='用户关键帧', collect_user=True, stage_key=stage.key), 1)
         frame_row.addWidget(self.frame_widget(stage.standard_frame, allow_adjust=False, label_text='标准关键帧'), 1)
         lay.addLayout(frame_row)
 
@@ -215,11 +235,17 @@ class ResultsWindow(QWidget):
                           'QPushButton:hover { background:#E1E7ED; }')
         return btn
 
-    def frame_widget(self, frame_ref, allow_adjust: bool, label_text: str, collect_user: bool = False):
+    def frame_widget(self, frame_ref, allow_adjust: bool, label_text: str, collect_user: bool = False, stage_key: str = ''):
         if frame_ref:
+            cb = None
+            if allow_adjust and stage_key:
+                def _on_changed(idx: int, sk=stage_key):
+                    # Just record; no engine calls
+                    self._pending_indices[sk] = idx
+                cb = _on_changed
             w = FrameDisplayWidget(frame_ref.video_path, frame_ref.frame_index,
                                    allow_adjust=allow_adjust, use_cache=True, label=label_text,
-                                   enable_pose=self._pose_enabled)
+                                   on_frame_changed=cb, enable_pose=self._pose_enabled)
             if collect_user:
                 self._user_frame_widgets.append(w)
             return w
@@ -231,5 +257,55 @@ class ResultsWindow(QWidget):
         lab.setStyleSheet('font-size:13px; color:#35404C;')
         v.addStretch(); v.addWidget(lab); v.addStretch()
         return box
+
+    # --- Refresh logic -------------------------------------------------
+    def _refresh_stage(self, stage_key: str, new_vm: ActionEvaluationVM):
+        # Replace vm and only rebuild stages (simplified: full stages rebuild)
+        self.vm = new_vm
+        self._user_frame_widgets = []
+        self._rebuild_stages()
+        self._rebuild_training()
+
+    def _rebuild_stages(self):
+        if not self._stages_container_layout:
+            return
+        lay = self._stages_container_layout
+        # remove all widgets except stretch at end
+        # First remove stretch if present (will add back later)
+        # Clear items
+        while lay.count():
+            item = lay.takeAt(0)
+            w = item.widget()
+            if w:
+                w.setParent(None)
+        for s in self.vm.stages:
+            lay.addWidget(self.build_stage_card(s))
+        lay.addStretch()
+
+    def _rebuild_training(self):
+        # Remove existing training widget and rebuild based on vm.training
+        if self._training_widget is not None:
+            self._training_widget.setParent(None)
+            self._training_widget = None
+        if self.vm.training and self._root_layout is not None:
+            self._training_widget = self.build_training()
+            self._root_layout.addWidget(self._training_widget)
+
+    def _confirm_recompute(self, stage_key: str):
+        if not (self._session and self._adapter and self._keyframes):
+            return
+        try:
+            # Apply pending index if any
+            if stage_key in self._pending_indices:
+                idx = self._pending_indices.pop(stage_key)
+                # commit to session / keyframe set
+                self._session.update_user_keyframe(stage_key, idx)
+            # Now evaluate only that stage
+            self._session.evaluate(stage_key=stage_key)
+            state = self._session.get_state()
+            new_vm = self._adapter.to_vm(state, self._keyframes.user, self._keyframes.standard)
+            self._refresh_stage(stage_key, new_vm)
+        except Exception:
+            pass
 
 __all__ = ['ResultsWindow']
