@@ -135,11 +135,31 @@ class EnhancedMainWindow(QWidget, I18nMixin):
         """更新所有UI文本"""
         # 窗口标题
         self.setWindowTitle(self.translate(TK.UI.MainWindow.TITLE))
-        """更新运动下拉框文本"""
+        # 设置/分组/标签/按钮文本（原实现遗漏导致界面控件空白）
+        if hasattr(self, 'settings_btn'):
+            self.settings_btn.setText(self.translate(TK.UI.MainWindow.SETTINGS))
+        if hasattr(self, 'settings_group'):
+            self.settings_group.setTitle(self.translate(TK.UI.MainWindow.ANALYSIS_GROUP))
+        if hasattr(self, 'sport_label'):
+            self.sport_label.setText(self.translate(TK.UI.MainWindow.SPORT_LABEL))
+        if hasattr(self, 'action_label'):
+            self.action_label.setText(self.translate(TK.UI.MainWindow.ACTION_LABEL))
+        if hasattr(self, 'import_user_btn'):
+            self.import_user_btn.setText(self.translate(TK.UI.MainWindow.IMPORT_USER))
+        if hasattr(self, 'import_standard_btn'):
+            self.import_standard_btn.setText(self.translate(TK.UI.MainWindow.IMPORT_STANDARD))
+        # Sport combo
         current_index = self.sport_combo.currentIndex()
+        self.sport_combo.blockSignals(True)
         self.sport_combo.clear()
         self.sport_combo.addItem(self.translate(TK.Analysis.Sports.BADMINTON))
-        self.sport_combo.setCurrentIndex(current_index)
+        self.sport_combo.setCurrentIndex(current_index if current_index >= 0 else 0)
+        self.sport_combo.blockSignals(False)
+        # Action combo（此处只显示一个动作，仍然刷新以确保语言切换）
+        self.update_action_combo()
+        # Compare button 文本根据当前引擎（目前始终 experimental）
+        if hasattr(self, 'compare_btn'):
+            self.update_compare_button_text()
 
     def update_compare_button_text(self):
         """更新对比按钮文本"""
