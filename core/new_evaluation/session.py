@@ -5,6 +5,7 @@ from .data_models import (
     TrainingBundle, StageConfig, MetricConfig, FrameRef
 )
 from .pose_provider import PoseProvider
+from core.llm.llm_refiner import SuggestionRefiner
 
 # Placeholder imports for existing engines (to be adapted)
 try:
@@ -74,6 +75,32 @@ class EvaluationSession:
         if not self.state.dirty:
             self.state.overall_score = self._aggregate_overall()
             self.state.training = self._generate_training()
+            # Build a simple raw summary (baseline before LLM)
+            try:
+                self.state.summary_raw = self._build_raw_summary()
+            except Exception:
+                self.state.summary_raw = None
+            # Optional LLM refinement
+            try:
+                refiner = SuggestionRefiner()
+                result = refiner.refine_from_state(self.state)
+                if result:
+                    # apply refined stage suggestions
+                    for sk, sr in self.state.stages.items():
+                        if sk in result.stage_suggestions:
+                            sr.suggestion_refined = result.stage_suggestions[sk]
+                    # apply refined training bundle
+                    if self.state.training:
+                        if result.training_key_issues:
+                            self.state.training.key_issues_refined = result.training_key_issues
+                        if result.training_drills:
+                            self.state.training.improvement_drills_refined = result.training_drills
+                        if result.training_next_steps:
+                            self.state.training.next_steps_refined = result.training_next_steps
+                    if result.refined_action_summary:
+                        self.state.refined_summary = result.refined_action_summary
+            except Exception as e:  # pragma: no cover
+                print(f"[LLM] refinement skipped due to error: {e}")
             self.bus.emit('action_completed', self.state)
 
     def update_user_keyframe(self, stage_key: str, frame_index: int):
@@ -294,6 +321,22 @@ class EvaluationSession:
             return None
         next_steps.append('Record a new video after practice for comparison')
         return TrainingBundle(key_issues=key_issues[:5], improvement_drills=drills[:5], next_steps=next_steps)
+
+    def _build_raw_summary(self) -> str:
+        if not self.state.stages:
+            return ''
+        parts = []
+        parts.append(f"Overall score {self.state.overall_score} across {len(self.state.stages)} stages.")
+        # Highlight worst stage
+        worst = None
+        for s in self.state.stages.values():
+            if worst is None or s.score < worst.score:
+                worst = s
+        if worst:
+            parts.append(f"Lowest stage: {worst.stage_key} ({worst.score}).")
+        if self.state.training and self.state.training.key_issues:
+            parts.append("Focus issues: " + ', '.join(self.state.training.key_issues[:3]))
+        return ' '.join(parts)
 
     # Accessors ----------------------------------------------------------
     def get_state(self) -> EvaluationState:

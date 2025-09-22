@@ -30,7 +30,7 @@ class UIAdapter:
                     name=friendly_names.get(base, base),
                     score=sr.score,
                     summary_raw=sr.summary or '',
-                    suggestion=sr.suggestion or '',
+                    suggestion=sr.suggestion_refined or sr.suggestion or '',
                     metrics=[UIAdapter._metric_vm(m) for m in sr.metrics],
                     user_frame=UIAdapter._frame_vm(uf),
                     standard_frame=UIAdapter._frame_vm(sf)
@@ -39,16 +39,16 @@ class UIAdapter:
         training_vm = None
         if state.training:
             training_vm = TrainingVM(
-                key_issues=state.training.key_issues,
-                improvement_drills=state.training.improvement_drills,
-                next_steps=state.training.next_steps
+                key_issues=state.training.key_issues_refined or state.training.key_issues,
+                improvement_drills=state.training.improvement_drills_refined or state.training.improvement_drills,
+                next_steps=state.training.next_steps_refined or state.training.next_steps
             )
         return ActionEvaluationVM(
             sport=state.sport,
             action_name=state.action,
             score=state.overall_score or 0,
-            summary_raw='Auto-generated brief overview',
-            summary_refined=None,
+            summary_raw=state.summary_raw or 'Auto-generated brief overview',
+            summary_refined=state.refined_summary,
             stages=stages_vm,
             training=training_vm,
             video=VideoInfo(user_video_path=UIAdapter._video_path(keyframes_user), standard_video_path=UIAdapter._video_path(keyframes_std))

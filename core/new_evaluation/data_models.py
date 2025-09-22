@@ -94,12 +94,16 @@ class StageResult:
     metrics: List[MetricValue]
     suggestion: Optional[str] = None
     summary: Optional[str] = None
+    suggestion_refined: Optional[str] = None
 
 @dataclass
 class TrainingBundle:
     key_issues: List[str] = field(default_factory=list)
     improvement_drills: List[str] = field(default_factory=list)
     next_steps: List[str] = field(default_factory=list)
+    key_issues_refined: List[str] = field(default_factory=list)
+    improvement_drills_refined: List[str] = field(default_factory=list)
+    next_steps_refined: List[str] = field(default_factory=list)
 
 @dataclass
 class EvaluationState:
@@ -110,6 +114,9 @@ class EvaluationState:
     training: Optional[TrainingBundle] = None
     dirty: set = field(default_factory=set)
     version: int = 0  # increment on each mutation
+    # High-level summaries
+    summary_raw: Optional[str] = None
+    refined_summary: Optional[str] = None
 
     def mark_dirty(self, stage_key: str):
         self.dirty.add(stage_key)

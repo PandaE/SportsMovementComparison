@@ -31,9 +31,9 @@ keyframes = KeyframeSet(
         'power': FrameRef(USER_VIDEO, 69)
     },
     standard={
-        'setup': FrameRef(STD_VIDEO, 36),
-        'backswing': FrameRef(STD_VIDEO, 57),
-        'power': FrameRef(STD_VIDEO, 80)
+        'setup': FrameRef(STD_VIDEO, 55),
+        'backswing': FrameRef(STD_VIDEO, 80),
+        'power': FrameRef(STD_VIDEO, 85)
     }
 )
 
