@@ -4,6 +4,7 @@ from typing import Optional
 from .view_models import (
     ActionEvaluationVM, StageVM, MetricVM, TrainingVM, FrameRef, VideoInfo
 )
+from core.new_evaluation.utils import normalize_stage_key
 
 def _score_to_int(raw: Optional[float]) -> int:
     if raw is None:
@@ -31,8 +32,8 @@ def _derive_status(value, std) -> str:
 def adapt_action_evaluation(core_eval, *, sport: Optional[str] = None, action_name: Optional[str] = None,
                             user_video_path: Optional[str] = None, standard_video_path: Optional[str] = None,
                             training_data: Optional[dict] = None) -> ActionEvaluationVM:
-    sport_val = sport or getattr(core_eval, 'sport', '未知')
-    action_val = action_name or getattr(core_eval, 'action_name', getattr(core_eval, 'name', '动作'))
+    sport_val = sport or getattr(core_eval, 'sport', 'Unknown')
+    action_val = action_name or getattr(core_eval, 'action_name', getattr(core_eval, 'name', 'Action'))
     return ActionEvaluationVM(
         sport=sport_val,
         action_name=action_val,
@@ -61,9 +62,14 @@ def _adapt_stage(stage_obj) -> StageVM:
         vpath = getattr(stage_obj.standard_frame, 'video_path', None) or getattr(stage_obj.standard_frame, 'source_video', None)
         if idx is not None and vpath:
             standard_frame_ref = FrameRef(frame_index=idx, video_path=vpath)
+    original_name = getattr(stage_obj, 'name', 'stage')
+    norm_key = normalize_stage_key(original_name)
+    display_name = getattr(stage_obj, 'display_name', original_name)
+    if display_name.endswith('_stage'):
+        display_name = display_name[:-6]
     return StageVM(
-        key=getattr(stage_obj, 'name', 'stage'),
-        name=getattr(stage_obj, 'display_name', getattr(stage_obj, 'name', '阶段')),
+        key=norm_key,
+        name=display_name,
         score=_score_to_int(getattr(stage_obj, 'score', None)),
         summary_raw=getattr(stage_obj, 'summary', None),
         suggestion=suggestion,

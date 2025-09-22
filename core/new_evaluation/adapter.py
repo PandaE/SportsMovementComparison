@@ -8,13 +8,21 @@ class UIAdapter:
     @staticmethod
     def to_vm(state: EvaluationState, keyframes_user: dict, keyframes_std: dict) -> ActionEvaluationVM:
         stages_vm = []
+        friendly_names = {
+            'setup': 'Setup',
+            'backswing': 'Backswing',
+            'power': 'Power',
+            'impact': 'Impact',
+            'follow_through': 'Follow Through'
+        }
         for sk, sr in state.stages.items():
+            base = sk[:-6] if sk.endswith('_stage') else sk
             uf = keyframes_user.get(sk)
             sf = keyframes_std.get(sk)
             stages_vm.append(
                 StageVM(
-                    key=sr.stage_key,
-                    name=sr.stage_key,
+                    key=base,
+                    name=friendly_names.get(base, base),
                     score=sr.score,
                     summary_raw=sr.summary or '',
                     suggestion=sr.suggestion or '',
@@ -34,7 +42,7 @@ class UIAdapter:
             sport=state.sport,
             action_name=state.action,
             score=state.overall_score or 0,
-            summary_raw='自动生成的简要概览',
+            summary_raw='Auto-generated brief overview',
             summary_refined=None,
             stages=stages_vm,
             training=training_vm,

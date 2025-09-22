@@ -5,7 +5,7 @@ Allows the new EvaluationSession to use real measurement rules
 defined in `core.experimental.config.sport_configs` without manual
 placeholder MetricConfig objects.
 """
-from typing import List
+from typing import List, Optional
 
 from .data_models import ActionConfig as NewActionConfig, StageConfig as NewStageConfig, MetricConfig, ScoringPolicy
 
@@ -28,12 +28,13 @@ def _rule_to_metric(rule: MeasurementRule) -> MetricConfig:  # type: ignore
         span = max(max_v - min_v, 1e-6)
         target = (min_v + max_v) / 2.0
         allowed_dev = span / 2.0
-        # warn if >15% beyond allowed, bad if >30%
-        warn_threshold = allowed_dev * 1.15
-        bad_threshold = allowed_dev * 1.30
+        warn_threshold = allowed_dev * 1.15  # >15% beyond allowed
+        bad_threshold = allowed_dev * 1.30   # >30% beyond allowed
+        display_en = getattr(rule, 'display_en', None)
+        metric_name = display_en or rule.name
     return MetricConfig(
         key=rule.name,
-        name=rule.name,
+        name=metric_name,
         unit=rule.unit,
         formula=rule.measurement_type,
         weight=rule.weight,
@@ -49,11 +50,19 @@ def convert(old_action: OldActionConfig) -> NewActionConfig:  # type: ignore
     for old_stage in old_action.stages:
         metrics = [_rule_to_metric(r) for r in old_stage.measurements]
         skey = old_stage.name[:-6] if old_stage.name.endswith('_stage') else old_stage.name
-        new_stages.append(NewStageConfig(key=skey, name=old_stage.description or old_stage.name, metrics=metrics, weight=old_stage.weight))
+        stage_display = getattr(old_stage, 'display_en', None) or (old_stage.description or old_stage.name)
+        new_stages.append(NewStageConfig(key=skey, name=stage_display, metrics=metrics, weight=old_stage.weight))
+    # 安全检查：阶段数量是否一致
+    try:
+        if hasattr(old_action, 'stages') and len(new_stages) != len(old_action.stages):
+            print(f"[convert warning] Stage count mismatch: {len(new_stages)} vs {len(old_action.stages)}")
+    except Exception:
+        pass
     scoring = ScoringPolicy(stage_weights={s.key: s.weight for s in new_stages})
+    action_name_display = getattr(old_action, 'display_en', None) or old_action.name
     return NewActionConfig(
-        sport='羽毛球',  # original old_action does not separate sport; fixed for current known config
-        action=old_action.name,
+        sport='羽毛球',
+        action=action_name_display,
         stages=new_stages,
         scoring=scoring
     )
