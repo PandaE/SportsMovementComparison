@@ -21,7 +21,7 @@ USER_VIDEO = r'D:\code\SportsMovementComparison\tests\experimental\test_data\me.
 STD_VIDEO = r'D:\code\SportsMovementComparison\tests\experimental\test_data\demo.mp4'
 
 # Build real config from experimental sport configs
-old_action_cfg = SportConfigs.get_config('Badminton', '正手高远球')
+old_action_cfg = SportConfigs.get_config('Badminton', 'Forehand Clear')
 config = convert(old_action_cfg)
 
 keyframes = KeyframeSet(
@@ -31,9 +31,9 @@ keyframes = KeyframeSet(
         'power': FrameRef(USER_VIDEO, 69)
     },
     standard={
-        'setup': FrameRef(USER_VIDEO, 36),
-        'backswing': FrameRef(USER_VIDEO, 57),
-        'power': FrameRef(USER_VIDEO, 80)
+        'setup': FrameRef(STD_VIDEO, 36),
+        'backswing': FrameRef(STD_VIDEO, 57),
+        'power': FrameRef(STD_VIDEO, 80)
     }
 )
 

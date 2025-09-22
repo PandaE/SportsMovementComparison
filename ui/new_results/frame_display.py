@@ -73,7 +73,7 @@ class FrameDisplayWidget(QWidget):
         frame_box.setStyleSheet('QFrame { background:#0b152233; border:1px solid #CED3D9; border-radius:12px; }')
         vb = QVBoxLayout(frame_box)
         vb.setContentsMargins(6,6,6,6)
-        self.image_label = QLabel('加载中...')
+        self.image_label = QLabel('Loading...')
         self.image_label.setAlignment(Qt.AlignCenter)
         self.image_label.setStyleSheet('font-size:12px; color:#2F3B48;')
         self.image_label.setMinimumSize(200,140)
@@ -199,11 +199,11 @@ class FrameDisplayWidget(QWidget):
                 return
         # Fallback
         if not self.video_path:
-            self.image_label.setText('无视频')
+            self.image_label.setText('No Video')
         elif cv2 is None:
-            self.image_label.setText('缺少 OpenCV')
+            self.image_label.setText('Missing OpenCV')
         else:
-            self.image_label.setText('无法加载帧')
+            self.image_label.setText('Failed to Load Frame')
         self._update_frame_info()
 
     # Events --------------------------------------------------------------
