@@ -34,13 +34,22 @@ def adapt_action_evaluation(core_eval, *, sport: Optional[str] = None, action_na
                             training_data: Optional[dict] = None) -> ActionEvaluationVM:
     sport_val = sport or getattr(core_eval, 'sport', 'Unknown')
     action_val = action_name or getattr(core_eval, 'action_name', getattr(core_eval, 'name', 'Action'))
+    stage_objs = getattr(core_eval, 'stages', [])
+    adapted = []
+    seen = set()
+    for s in stage_objs:
+        vm = _adapt_stage(s)
+        if vm.key in seen:
+            continue
+        seen.add(vm.key)
+        adapted.append(vm)
     return ActionEvaluationVM(
         sport=sport_val,
         action_name=action_val,
         score=_score_to_int(getattr(core_eval, 'score', None)),
         summary_raw=getattr(core_eval, 'summary', None),
         summary_refined=getattr(core_eval, 'refined_summary', None),
-        stages=[_adapt_stage(s) for s in getattr(core_eval, 'stages', [])],
+        stages=adapted,
         training=_adapt_training(training_data) if training_data else None,
         video=VideoInfo(user_video_path=user_video_path, standard_video_path=standard_video_path)
             if (user_video_path or standard_video_path) else None

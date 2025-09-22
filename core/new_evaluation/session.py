@@ -276,12 +276,20 @@ class EvaluationSession:
         key_issues = []
         drills = []
         next_steps = []
+        seen_issue = set()
+        seen_drill = set()
         for s in self.state.stages.values():
             for m in s.metrics:
-                if m.status == 'bad':
+                # collect bad metrics once
+                if m.status == 'bad' and m.name not in seen_issue:
                     key_issues.append(m.name)
+                    seen_issue.add(m.name)
+                # collect drill for bad/warn once
                 if m.status in ('bad','warn'):
-                    drills.append(f"Repetition drill focusing on {m.name}")
+                    drill_text = f"Repetition drill focusing on {m.name}"
+                    if drill_text not in seen_drill:
+                        drills.append(drill_text)
+                        seen_drill.add(drill_text)
         if not key_issues and not drills:
             return None
         next_steps.append('Record a new video after practice for comparison')
