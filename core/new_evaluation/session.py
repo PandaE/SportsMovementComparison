@@ -137,6 +137,13 @@ class EvaluationSession:
         if stage_engine_result_user:
             user_map = stage_engine_result_user.measurements
             std_map = stage_engine_result_std.measurements if stage_engine_result_std else {}
+            # simple unit mapping zh->en
+            unit_mapping = {
+                '度': '°',
+                '像素': 'px',
+                '秒': 's',
+                '毫秒': 'ms'
+            }
             for meas_name, mv_user in user_map.items():
                 mv_std = std_map.get(meas_name)
                 user_val = mv_user.value if mv_user.status == 'ok' else None
@@ -189,10 +196,21 @@ class EvaluationSession:
                         status = 'na'
                     else:
                         status = 'bad'
+                # Determine display (English) name if available on underlying rule
+                display_name = meas_name
+                try:
+                    if 'rule' in locals() and rule:  # type: ignore
+                        disp = getattr(rule, 'display_en', None)  # type: ignore
+                        if disp:
+                            display_name = disp
+                except Exception:
+                    pass
+                # map unit
+                unit_disp = unit_mapping.get(mv_user.unit, mv_user.unit)
                 metrics.append(MetricValue(
                     key=meas_name,
-                    name=meas_name,
-                    unit=mv_user.unit,
+                    name=display_name,
+                    unit=unit_disp,
                     user_value=user_val,
                     std_value=std_val,
                     deviation=deviation,
@@ -249,24 +267,32 @@ class EvaluationSession:
         warn_keys = [m.name for m in metrics if m.status == 'warn']
         parts = []
         if bad_keys:
-            parts.append('需要重点改进: ' + ', '.join(bad_keys))
+            parts.append('Needs Major Improvement: ' + ', '.join(bad_keys))
         if warn_keys:
-            parts.append('可优化: ' + ', '.join(warn_keys))
-        return '；'.join(parts) or ''
+            parts.append('Can Be Optimized: ' + ', '.join(warn_keys))
+        return '; '.join(parts) or ''
 
     def _generate_training(self) -> Optional[TrainingBundle]:
         key_issues = []
         drills = []
         next_steps = []
+        seen_issue = set()
+        seen_drill = set()
         for s in self.state.stages.values():
             for m in s.metrics:
-                if m.status == 'bad':
+                # collect bad metrics once
+                if m.status == 'bad' and m.name not in seen_issue:
                     key_issues.append(m.name)
+                    seen_issue.add(m.name)
+                # collect drill for bad/warn once
                 if m.status in ('bad','warn'):
-                    drills.append(f"针对 {m.name} 的重复练习")
+                    drill_text = f"Repetition drill focusing on {m.name}"
+                    if drill_text not in seen_drill:
+                        drills.append(drill_text)
+                        seen_drill.add(drill_text)
         if not key_issues and not drills:
             return None
-        next_steps.append('复盘后录制新视频对比')
+        next_steps.append('Record a new video after practice for comparison')
         return TrainingBundle(key_issues=key_issues[:5], improvement_drills=drills[:5], next_steps=next_steps)
 
     # Accessors ----------------------------------------------------------

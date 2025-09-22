@@ -34,7 +34,7 @@ class ResultsWindow(QWidget):
         self._stages_container_layout = None
         self._stages_scroll = None
         self._training_widget = None
-        self.setWindowTitle('动作分析结果 (简化模型)')
+        self.setWindowTitle('Action Analysis Results (Simplified Model)')
         self.resize(1180, 860)
         self.build_ui()
 
@@ -110,7 +110,7 @@ class ResultsWindow(QWidget):
     # --- Controls (pose toggle etc.) -----------------------------------
     def build_controls_row(self):
         row = QHBoxLayout(); row.setContentsMargins(0,0,0,0); row.setSpacing(12)
-        pose_btn = self.small_button('显示姿态骨架')
+        pose_btn = self.small_button('Show Pose Skeleton')
         pose_btn.setCheckable(True)
         pose_btn.toggled.connect(lambda st: self._on_toggle_pose(st, pose_btn))
         row.addWidget(pose_btn)
@@ -119,7 +119,7 @@ class ResultsWindow(QWidget):
 
     def _on_toggle_pose(self, state: bool, btn: QPushButton):
         self._pose_enabled = state
-        btn.setText('隐藏姿态骨架' if state else '显示姿态骨架')
+        btn.setText('Hide Pose Skeleton' if state else 'Show Pose Skeleton')
         # Apply to all user frame widgets
         for w in self._user_frame_widgets:
             try:
@@ -133,19 +133,19 @@ class ResultsWindow(QWidget):
 
         # Header
         header = QHBoxLayout()
-        title = QLabel(f"{stage.name} | {stage.score} 分")
+        title = QLabel(f"{stage.name} | {stage.score} pts")
         title.setStyleSheet(f"font-size:20px; font-weight:600; color:{score_color(stage.score)};")
         header.addWidget(title)
         header.addStretch()
-        adj_btn = self.small_button('调整帧')
+        adj_btn = self.small_button('Adjust Frame')
         adj_btn.clicked.connect(lambda _, sk=stage.key: self._confirm_recompute(sk))
         header.addWidget(adj_btn)
         lay.addLayout(header)
 
         # Frames (actual display widget w/ caching & optional slider)
         frame_row = QHBoxLayout(); frame_row.setSpacing(16)
-        frame_row.addWidget(self.frame_widget(stage.user_frame, allow_adjust=True, label_text='用户关键帧', collect_user=True, stage_key=stage.key), 1)
-        frame_row.addWidget(self.frame_widget(stage.standard_frame, allow_adjust=False, label_text='标准关键帧'), 1)
+        frame_row.addWidget(self.frame_widget(stage.user_frame, allow_adjust=True, label_text='User Key Frame', collect_user=True, stage_key=stage.key), 1)
+        frame_row.addWidget(self.frame_widget(stage.standard_frame, allow_adjust=False, label_text='Standard Key Frame'), 1)
         lay.addLayout(frame_row)
 
         # Metrics table
@@ -153,7 +153,7 @@ class ResultsWindow(QWidget):
 
         # Suggestion
         if stage.suggestion:
-            sug = QLabel(f"改进建议：{stage.suggestion}")
+            sug = QLabel(f"Improvement Suggestion: {stage.suggestion}")
             sug.setWordWrap(True)
             sug.setStyleSheet('font-size:14px; color:#2F3B48; background:#F6F8FA; border-radius:8px; padding:8px 10px;')
             lay.addWidget(sug)
@@ -162,7 +162,7 @@ class ResultsWindow(QWidget):
     # --- Metrics table ----------------------------------------------------
     def metrics_table(self, metrics):
         table = QTableWidget(len(metrics), 5)
-        table.setHorizontalHeaderLabels(['指标', '用户', '标准', '偏差', '状态'])
+        table.setHorizontalHeaderLabels(['Metric', 'User', 'Standard', 'Deviation', 'Status'])
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         table.setEditTriggers(table.NoEditTriggers)
         table.setSelectionMode(table.NoSelection)
@@ -208,13 +208,13 @@ class ResultsWindow(QWidget):
     def build_training(self):
         blk = QFrame(); blk.setStyleSheet('QFrame { background:white; border:1px solid #E2E6EB; border-radius:16px; }')
         lay = QVBoxLayout(blk); lay.setContentsMargins(20,16,20,16); lay.setSpacing(12)
-        title = QLabel('训练指导'); title.setStyleSheet('font-size:20px; font-weight:600; color:#1A2736;')
+        title = QLabel('Training Guidance'); title.setStyleSheet('font-size:20px; font-weight:600; color:#1A2736;')
         lay.addWidget(title)
         tri = self.vm.training
         if tri:
-            lay.addLayout(self._training_row('关键问题', tri.key_issues))
-            lay.addLayout(self._training_row('改进练习', tri.improvement_drills))
-            lay.addLayout(self._training_row('下一步建议', tri.next_steps))
+            lay.addLayout(self._training_row('Key Issues', tri.key_issues))
+            lay.addLayout(self._training_row('Improvement Drills', tri.improvement_drills))
+            lay.addLayout(self._training_row('Next Steps', tri.next_steps))
         return blk
 
     def _training_row(self, label, lines):
@@ -253,7 +253,7 @@ class ResultsWindow(QWidget):
         box = QFrame(); box.setMinimumSize(220,160)
         box.setStyleSheet('background:#0b152233; border:1px dashed #9AA4B1; border-radius:12px;')
         v = QVBoxLayout(box); v.setContentsMargins(4,4,4,4)
-        lab = QLabel(label_text + '\n(无数据)'); lab.setAlignment(Qt.AlignCenter)
+        lab = QLabel(label_text + '\n(No Data)'); lab.setAlignment(Qt.AlignCenter)
         lab.setStyleSheet('font-size:13px; color:#35404C;')
         v.addStretch(); v.addWidget(lab); v.addStretch()
         return box
