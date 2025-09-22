@@ -1,0 +1,12 @@
+{
+  "refined_action_summary": "forehand_clear evaluation summary.",
+  "stages": {
+    "setup": {
+      "refined_suggestion": "No immediate issues detected."
+    },
+    "backswing": {
+      "refined_suggestion": "No immediate issues detected."
+    }
+  },
+  "training": {}
+}
