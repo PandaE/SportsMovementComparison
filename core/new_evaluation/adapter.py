@@ -15,10 +15,15 @@ class UIAdapter:
             'impact': 'Impact',
             'follow_through': 'Follow Through'
         }
+        added = set()
         for sk, sr in state.stages.items():
             base = sk[:-6] if sk.endswith('_stage') else sk
-            uf = keyframes_user.get(sk)
-            sf = keyframes_std.get(sk)
+            if base in added:
+                # duplicate (both 'xxx' and 'xxx_stage' present) -> skip later one
+                continue
+            added.add(base)
+            uf = keyframes_user.get(sk) or keyframes_user.get(base) or keyframes_user.get(f"{base}_stage")
+            sf = keyframes_std.get(sk) or keyframes_std.get(base) or keyframes_std.get(f"{base}_stage")
             stages_vm.append(
                 StageVM(
                     key=base,
