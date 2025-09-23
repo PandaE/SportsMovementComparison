@@ -1,0 +1,25 @@
+{
+  "refined_action_summary": "Preliminary automated coaching summary (dummy provider).",
+  "stages": {
+    "setup": {
+      "refined_suggestion": "Needs Major Improvement: Upper-Lower Arm Angle"
+    },
+    "backswing": {
+      "refined_suggestion": "No change"
+    },
+    "power": {
+      "refined_suggestion": "No change"
+    }
+  },
+  "training": {
+    "key_issues": [
+      "Upper-Lower Arm Angle"
+    ],
+    "improvement_drills": [
+      "Repetition drill focusing on Upper-Lower Arm Angle"
+    ],
+    "next_steps": [
+      "Record a new video after practice for comparison"
+    ]
+  }
+}
