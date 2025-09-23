@@ -45,3 +45,6 @@ test-results/
 # Misc
 *.bak
 *.tmp
+
+# LLM cache
+.cache/llm/

@@ -78,7 +78,7 @@ class AzureOpenAIProvider(_BaseProvider):
                             {'role': 'system', 'content': system_prompt},
                             {'role': 'user', 'content': user_content}
                         ],
-                        temperature=0.4,
+                        temperature=1,
                         max_tokens=800,
                         timeout=timeout
                     )
@@ -136,7 +136,23 @@ class AzureOpenAIProvider(_BaseProvider):
 
 class SuggestionRefiner:
     def __init__(self, enable: bool = True, use_cache: bool = True):
-        self.enable = enable and os.getenv('ENABLE_LLM_REFINEMENT', '0') in ('1','true','True')
+        # 判定是否启用：
+        # 优先级：
+        #  1. 如果设置 ENABLE_LLM_REFINEMENT=0 -> 强制关闭
+        #  2. 如果 ENABLE_LLM_REFINEMENT=1/true -> 开启
+        #  3. 未设置该变量时，若检测到全部 Azure OpenAI 关键变量存在则自动开启
+        #  4. 其他情况关闭并使用 DummyProvider
+        env_flag = os.getenv('ENABLE_LLM_REFINEMENT')
+        azure_ready = all(os.getenv(k) for k in ('AZURE_OPENAI_ENDPOINT','AZURE_OPENAI_API_KEY','AZURE_OPENAI_DEPLOYMENT'))
+        if not enable:
+            self.enable = False
+            _disable_reason = 'explicit enable parameter = False'
+        elif env_flag is not None:
+            self.enable = env_flag in ('1','true','True')
+            _disable_reason = f"env ENABLE_LLM_REFINEMENT={env_flag} not truthy" if not self.enable else ''
+        else:
+            self.enable = azure_ready
+            _disable_reason = '' if self.enable else 'azure env vars missing'
         # Allow disabling cache via env
         no_cache_env = os.getenv('LLM_NO_CACHE', '0').lower() in ('1','true','yes')
         self.use_cache = use_cache and (not no_cache_env)
@@ -145,15 +161,19 @@ class SuggestionRefiner:
         self._provider: _BaseProvider
         self._debug = os.getenv('LLM_DEBUG', '0').lower() in ('1','true','yes')
         if not self.enable:
+            if self._debug:
+                print(f"[LLM][DEBUG] refinement disabled -> {_disable_reason}")
             self._provider = DummyProvider()
         else:
             try:
                 self._provider = AzureOpenAIProvider()
             except Exception as e:
+                if self._debug:
+                    print(f"[LLM][DEBUG] Azure provider init failed, fallback to dummy: {e}")
                 print(f"[LLM] Falling back to DummyProvider: {e}")
                 self._provider = DummyProvider()
         if self._debug:
-            print(f"[LLM][DEBUG] enable={self.enable} provider={self._provider.__class__.__name__} use_cache={self.use_cache}")
+            print(f"[LLM][DEBUG] enable={self.enable} azure_ready={azure_ready} provider={self._provider.__class__.__name__} use_cache={self.use_cache}")
 
     # Public API -----------------------------------------------------
     def refine_from_state(self, state) -> Optional[RefineResult]:
@@ -237,6 +257,7 @@ class SuggestionRefiner:
         attempts = 0
         data = None
         last_err: Optional[Exception] = None
+        success = False  # 标记是否成功得到模型有效 JSON
         while attempts < 3 and data is None:
             try:
                 start_ts = time.time()
@@ -248,6 +269,7 @@ class SuggestionRefiner:
                 data = self._try_parse_json(resp_text)
                 if data is None or not isinstance(data, dict):
                     raise ValueError('Primary JSON parse failed')
+                success = True
             except Exception as e:
                 last_err = e
                 if self._debug:
@@ -265,12 +287,14 @@ class SuggestionRefiner:
                 'stages': {s['stage_key']: {'refined_suggestion': (s.get('raw_suggestion') or 'No immediate issues detected.')} for s in payload['stages']},
                 'training': payload.get('training', {})
             }
-        if self.use_cache:
+        if self.use_cache and success:  # 只有成功结果才缓存
             try:
                 with open(cache_file, 'w', encoding='utf-8') as f:
                     json.dump(data, f, ensure_ascii=False, indent=2)
             except Exception:
                 pass
+        elif self._debug and self.use_cache and not success:
+            print("[LLM][DEBUG] skip caching fallback result")
         return self._parse_result(data, raw=data)
 
     # More robust JSON extraction (handles code fences and extra text)

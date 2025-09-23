@@ -67,8 +67,8 @@ class SportConfigs:
                 measurement_type="vertical_distance",
                 keypoints=["right_elbow"],
                 unit="像素",
-                tolerance_range=(-50, 50),
-                weight=1.0,
+                tolerance_range=(-40, 40),
+                weight=0.5,
                 reference_point="right_shoulder",
                 direction="up"
             ),
@@ -79,8 +79,8 @@ class SportConfigs:
                 measurement_type="horizontal_distance", 
                 keypoints=["right_wrist"],
                 unit="像素",
-                tolerance_range=(30, 120),
-                weight=1.0,
+                tolerance_range=(40, 90),
+                weight=0.5,
                 reference_point="right_elbow",
                 direction="back"
             )
@@ -95,7 +95,7 @@ class SportConfigs:
                 measurement_type="angle",
                 keypoints=["right_shoulder", "right_elbow", "right_wrist"],
                 unit="度",
-                tolerance_range=(140, 180),
+                tolerance_range=(160, 180),
                 weight=1.0
             )
         ]
@@ -109,7 +109,7 @@ class SportConfigs:
                 measurement_type="angle",
                 keypoints=["right_shoulder", "right_elbow", "right_wrist"],
                 unit="度",
-                tolerance_range=(20, 150),
+                tolerance_range=(60, 120),
                 weight=1.0
             )
         ]

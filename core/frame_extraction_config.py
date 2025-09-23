@@ -11,8 +11,8 @@ PRECONFIG_KEYFRAMES: Dict[str, Dict[str, Dict[str, List[Dict[str, Any]]]]] = {
             # 示例：标准视频文件名（不含路径）与关键帧（帧号示例值）
             'right1.mp4': [
                 {'frame': 88, 'label': '架拍'},
-                {'frame': 105, 'label': '引拍'},
-                {'frame': 112, 'label': '击球'},
+                {'frame': 104, 'label': '引拍'},
+                {'frame': 113, 'label': '击球'},
             ],
         }
     }

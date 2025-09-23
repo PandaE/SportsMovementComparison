@@ -34,7 +34,7 @@ class SimpleVideoPlayer(QWidget):
 
     def _build_ui(self):
         layout = QVBoxLayout(self); layout.setContentsMargins(0,0,0,0); layout.setSpacing(6)
-        self.video_label = QLabel('无视频'); self.video_label.setAlignment(Qt.AlignCenter)
+        self.video_label = QLabel('No Video'); self.video_label.setAlignment(Qt.AlignCenter)
         self.video_label.setMinimumSize(self._fixed_width, self._min_height)
         self.video_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.video_label.setStyleSheet('background:#10161a; color:#7f8b95; border:1px solid #2c3a46; border-radius:6px;')
@@ -45,7 +45,7 @@ class SimpleVideoPlayer(QWidget):
         layout.addWidget(self.slider)
 
         bar = QHBoxLayout(); bar.setSpacing(8)
-        self.play_btn = QPushButton('播放'); self.play_btn.setFixedHeight(34)
+        self.play_btn = QPushButton('Play'); self.play_btn.setFixedHeight(34)
         self.play_btn.clicked.connect(self.toggle_play)
         self.info_label = QLabel('-- / --'); self.info_label.setStyleSheet('color:#394956; font-size:12px;')
         bar.addWidget(self.play_btn)
@@ -79,7 +79,7 @@ class SimpleVideoPlayer(QWidget):
         if self._playing:
             self._playing = False
             self.timer.stop()
-            self.play_btn.setText('播放')
+            self.play_btn.setText('Play')
         else:
             self._playing = True
             if self.fps <= 0:
@@ -89,7 +89,7 @@ class SimpleVideoPlayer(QWidget):
             self._play_start_frame = self.current_frame
             # 使用较小间隔（10ms）高频检查，内部按时间计算应到达的帧索引
             self.timer.start(10)
-            self.play_btn.setText('暂停')
+            self.play_btn.setText('Pause')
 
     # --- Internal ---
     def _advance(self):

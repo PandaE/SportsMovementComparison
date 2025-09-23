@@ -1,0 +1,28 @@
+{
+  "refined_action_summary": "Improve setup with a comfortable elbow angle, add more wrist coil in the backswing, and keep full extension at impact for a stronger forehand clear.",
+  "stages": {
+    "setup": {
+      "refined_suggestion": "Keep the elbow slightly more open so the arm forms a relaxed, balanced angle during the setup."
+    },
+    "backswing": {
+      "refined_suggestion": "Let the wrist hinge back further to create more racket head distance and store elastic power for the forward swing."
+    },
+    "power": {
+      "refined_suggestion": "Stretch the hitting arm fully through the shuttle at impact to maximize speed and lift."
+    }
+  },
+  "training": {
+    "key_issues": [
+      "Wrist Backswing Distance",
+      "Arm Extension at Impact"
+    ],
+    "improvement_drills": [
+      "Practice repeating the setup with a relaxed elbow opening",
+      "Practice controlled wrist coil during the backswing",
+      "Practice full arm follow-through at impact"
+    ],
+    "next_steps": [
+      "Record a new video after practice to check for smoother setup, stronger wrist coil, and full extension"
+    ]
+  }
+}

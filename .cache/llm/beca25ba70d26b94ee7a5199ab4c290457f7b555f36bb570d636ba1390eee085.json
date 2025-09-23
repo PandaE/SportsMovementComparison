@@ -1,0 +1,29 @@
+{
+  "refined_action_summary": "Your forehand clear needs improvement in arm positioning and wrist backswing. Focus on raising the upper-lower arm angle in setup, increasing wrist hinge in backswing, and fully extending the arm at impact to generate power.",
+  "stages": {
+    "setup": {
+      "refined_suggestion": "Raise your elbow and open the shoulder to achieve an upper-lower arm angle near 99°, keeping the racket at shoulder height before initiating the swing."
+    },
+    "backswing": {
+      "refined_suggestion": "Hinge the wrist further by rotating the forearm backward while maintaining stable elbow height to store more potential energy."
+    },
+    "power": {
+      "refined_suggestion": "Drive through the shuttle with a fully extended arm at impact, aiming for near 180° to maximize power transfer."
+    }
+  },
+  "training": {
+    "key_issues": [
+      "Upper-Lower Arm Angle",
+      "Wrist Backswing Distance",
+      "Arm Extension at Impact"
+    ],
+    "improvement_drills": [
+      "Slow-motion forehand clears focusing on achieving correct arm angle from setup through follow-through",
+      "Wrist hinge exercises to increase backswing range",
+      "Shadow swings emphasizing full arm extension at impact point"
+    ],
+    "next_steps": [
+      "Record a new video after drills to compare arm angles and backswing improvements"
+    ]
+  }
+}

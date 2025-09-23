@@ -157,6 +157,20 @@ class EvaluationSession:
                         stage_engine_result_user = self._metrics_engine.compute_stage(eng_stage, pose_user, frame_index=(user_fr.frame_index if user_fr else 0))
                     if pose_std is not None:
                         stage_engine_result_std = self._metrics_engine.compute_stage(eng_stage, pose_std, frame_index=(std_fr.frame_index if std_fr else 0))
+            # 临时调试输出：查看该阶段 user / std 测量状态以及缺失关键点
+            if stage_engine_result_user or stage_engine_result_std:
+                try:  # 防御性
+                    def _summ(res):
+                        if not res:
+                            return None
+                        return {k: v.status for k, v in res.measurements.items()}
+                    print(
+                        f"[DEBUG][stage={cfg.key}] user_status={_summ(stage_engine_result_user)} std_status={_summ(stage_engine_result_std)} "
+                        f"user_missing={getattr(stage_engine_result_user,'missing_keypoints',None)} "
+                        f"std_missing={getattr(stage_engine_result_std,'missing_keypoints',None)}"
+                    )
+                except Exception:
+                    pass
         except Exception:
             stage_engine_result_user = None
             stage_engine_result_std = None
@@ -164,26 +178,31 @@ class EvaluationSession:
         if stage_engine_result_user:
             user_map = stage_engine_result_user.measurements
             std_map = stage_engine_result_std.measurements if stage_engine_result_std else {}
-            # simple unit mapping zh->en
             unit_mapping = {
                 '度': '°',
                 '像素': 'px',
                 '秒': 's',
                 '毫秒': 'ms'
             }
-            for meas_name, mv_user in user_map.items():
+            # Iterate union so that standard-only or user-only measurements still appear
+            all_names = set(user_map.keys()) | set(std_map.keys())
+            for meas_name in sorted(all_names):
+                mv_user = user_map.get(meas_name)
                 mv_std = std_map.get(meas_name)
-                user_val = mv_user.value if mv_user.status == 'ok' else None
-                std_val = mv_std.value if mv_std and mv_std.status == 'ok' else None
-                deviation = None
+                # Accept values for ok/warn/bad (not only ok) to surface more context
+                user_val = (mv_user.value if (mv_user and mv_user.status in ('ok','warn','bad')) else None)
+                std_val = (mv_std.value if (mv_std and mv_std.status in ('ok','warn','bad')) else None)
+                deviation = user_val - std_val if (user_val is not None and std_val is not None) else None
+                # Derive status primarily from user metric; fallback to std
                 status = 'na'
+                if mv_user:
+                    status = mv_user.status if mv_user.status in ('ok','warn','bad') else 'na'
+                elif mv_std:
+                    status = mv_std.status if mv_std.status in ('ok','warn','bad') else 'na'
+                # Threshold refinement only if both values exist and rule has tolerance
+                rule = None
                 if user_val is not None and std_val is not None:
-                    deviation = user_val - std_val
-                    # Simple tolerance-driven status using std stage rule tolerance if available
-                    tolerance = None
                     try:
-                        # find rule via experimental config (already loaded) for thresholding
-                        rule = None
                         for st in getattr(self, '_engine_action_cfg').stages:  # type: ignore
                             if st.name == eng_stage.name:  # type: ignore
                                 for r in st.measurements:
@@ -191,49 +210,39 @@ class EvaluationSession:
                                         rule = r; break
                             if rule: break
                         if rule:
-                            rng = rule.tolerance_range  # (min,max)
+                            rng = rule.tolerance_range  # type: ignore
                             if rng:
                                 min_v, max_v = rng
-                                if min_v <= user_val <= max_v:
-                                    status = 'ok'
-                                else:
-                                    # Distance from nearest boundary to classify warn/bad
-                                    span = max_v - min_v if max_v > min_v else 1.0
-                                    dist = 0.0
-                                    if user_val < min_v:
-                                        dist = min_v - user_val
-                                    else:
-                                        dist = user_val - max_v
+                                if not (min_v <= user_val <= max_v):
+                                    span = max(max_v - min_v, 1e-6)
+                                    dist = min(abs(user_val - min_v), abs(user_val - max_v))
                                     ratio = dist / span
-                                    if ratio <= 0.1:
+                                    if ratio <= 0.1 and status == 'ok':
                                         status = 'warn'
-                                    else:
+                                    elif ratio > 0.1:
                                         status = 'bad'
-                            else:
-                                status = 'ok'
-                        else:
-                            status = 'ok'
                     except Exception:
-                        status = 'ok'
-                else:
-                    # fallback to user measurement status mapping
-                    if mv_user.status == 'ok':
-                        status = 'ok'
-                    elif mv_user.status == 'missing':
-                        status = 'na'
-                    else:
-                        status = 'bad'
-                # Determine display (English) name if available on underlying rule
+                        pass
+                # Determine display name (English)
                 display_name = meas_name
                 try:
-                    if 'rule' in locals() and rule:  # type: ignore
+                    if rule:
                         disp = getattr(rule, 'display_en', None)  # type: ignore
                         if disp:
                             display_name = disp
+                    if display_name == meas_name:
+                        zh_map = {
+                            '肘部高度': 'Elbow Height',
+                            '手腕后摆': 'Wrist Backswing Distance',
+                            '击球时手臂舒展度': 'Arm Extension at Impact',
+                            '大臂小臂夹角': 'Upper-Lower Arm Angle',
+                            '肩部高度': 'Shoulder Height',
+                            '膝盖弯曲角度': 'Knee Bend Angle'
+                        }
+                        display_name = zh_map.get(display_name, display_name)
                 except Exception:
                     pass
-                # map unit
-                unit_disp = unit_mapping.get(mv_user.unit, mv_user.unit)
+                unit_disp = unit_mapping.get(getattr(mv_user, 'unit', None) or getattr(mv_std, 'unit', None), getattr(mv_user, 'unit', None))
                 metrics.append(MetricValue(
                     key=meas_name,
                     name=display_name,

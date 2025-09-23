@@ -1,0 +1,28 @@
+{
+  "refined_action_summary": "Optimize arm positioning and racket loading by improving upper-lower arm angle, increasing wrist backswing, and achieving full arm extension at impact for a more powerful forehand clear",
+  "stages": {
+    "setup": {
+      "refined_suggestion": "Reduce upper-lower arm angle to around 100° to maintain a compact ready position and improve swing efficiency"
+    },
+    "backswing": {
+      "refined_suggestion": "Increase wrist backswing to at least 0.02 px by driving the racket head further back while keeping the elbow stable"
+    },
+    "power": {
+      "refined_suggestion": "Fully extend the hitting arm through impact to reach about 179° and maximize power transfer"
+    }
+  },
+  "training": {
+    "key_issues": [
+      "Wrist Backswing Distance",
+      "Arm Extension at Impact"
+    ],
+    "improvement_drills": [
+      "Repetition drill focusing on Upper-Lower Arm Angle",
+      "Repetition drill focusing on Wrist Backswing Distance",
+      "Repetition drill focusing on Arm Extension at Impact"
+    ],
+    "next_steps": [
+      "Record a new video after practice for comparison"
+    ]
+  }
+}

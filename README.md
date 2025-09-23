@@ -69,7 +69,6 @@ Key Modules:
 - `core/metrics_engine.py` – pluggable measurement handlers
 - `core/evaluation/` – scoring strategies, feedback generation, incremental evaluation
 - `core/pipeline/evaluation_pipeline.py` – high-level helpers (`run_action_evaluation`, `run_action_evaluation_incremental`)
-- `demo_end_to_end_evaluation.py` – example end-to-end usage
 
 Incremental Updates:
 

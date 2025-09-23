@@ -44,8 +44,8 @@ class PreparationState:
 
 class MainWindowState:
     def __init__(self):
-        self.sport = '羽毛球'
-        self.action = '正手高远球'
+        self.sport = 'Badminton'
+        self.action = 'Forehand Clear'
         self.user_state = VideoLoadState.EMPTY
         self.std_state = VideoLoadState.EMPTY
         self.user_meta = None
@@ -57,7 +57,7 @@ class RedesignedMainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.state = MainWindowState()
-        self.setWindowTitle('动作对比分析')
+        self.setWindowTitle('Movement Comparison')
         self.resize(1280, 820)
         self._std_download_thread = None
         self._std_worker = None
@@ -74,38 +74,34 @@ class RedesignedMainWindow(QWidget):
         root.setContentsMargins(28, 20, 28, 20)
         root.setSpacing(18)
 
-        # 标题区
+        # Title section
         head = QVBoxLayout(); head.setSpacing(4)
-        title = QLabel('动作对比分析')
+        title = QLabel('Movement Comparison')
         title.setStyleSheet('font-size:28px; font-weight:600; color:#1A2736;')
-        desc = QLabel('请选择运动、动作，并提供标准视频与个人视频进行分析')
+        desc = QLabel('Select sport/action, choose standard & user videos, then run analysis')
         desc.setStyleSheet('font-size:14px; color:#485463;')
         head.addWidget(title)
         head.addWidget(desc)
         root.addLayout(head)
 
-        # 选择行
+        # Selection row
         sel_row = QHBoxLayout(); sel_row.setSpacing(12)
-        self.sport_combo = QComboBox(); self.sport_combo.addItems(['羽毛球'])
-        self.action_combo = QComboBox(); self.action_combo.addItems(['正手高远球'])
-        sel_row.addWidget(self._labeled('运动', self.sport_combo))
-        sel_row.addWidget(self._labeled('动作', self.action_combo))
+        self.sport_combo = QComboBox(); self.sport_combo.addItems(['Badminton'])
+        self.action_combo = QComboBox(); self.action_combo.addItems(['Forehand Clear'])
+        sel_row.addWidget(self._labeled('Sport', self.sport_combo))
+        sel_row.addWidget(self._labeled('Action', self.action_combo))
         sel_row.addStretch()
         root.addLayout(sel_row)
 
-        # 视频选择控制区（标准视频来自 Blob 下拉，个人视频本地文件）
+        # Video selection controls
         ctrl_row = QHBoxLayout(); ctrl_row.setSpacing(16)
-        # 标准视频下拉
+        # Standard video dropdown
         self.standard_combo = QComboBox(); self.standard_combo.setMinimumWidth(260)
         self.standard_combo.setEditable(False)
-        self.standard_refresh_btn = QPushButton('刷新标准视频列表')
-        self.load_standard_btn = QPushButton('加载选中标准视频')
-        ctrl_row.addWidget(QLabel('标准视频:'))
+        ctrl_row.addWidget(QLabel('Standard:'))
         ctrl_row.addWidget(self.standard_combo)
-        ctrl_row.addWidget(self.standard_refresh_btn)
-        ctrl_row.addWidget(self.load_standard_btn)
         # 个人视频按钮
-        self.user_select_btn = QPushButton('选择个人视频')
+        self.user_select_btn = QPushButton('Select User Video')
         ctrl_row.addStretch()
         ctrl_row.addWidget(self.user_select_btn)
         root.addLayout(ctrl_row)
@@ -120,10 +116,10 @@ class RedesignedMainWindow(QWidget):
 
     # （已移除校验条，留白可后续放提示或统计）
 
-        # 准备状态卡片
+        # Status card
         prep_card = QFrame(); prep_card.setStyleSheet('QFrame { background:white; border:1px solid #E2E6EB; border-radius:16px; }')
         pc_lay = QVBoxLayout(prep_card); pc_lay.setContentsMargins(16,14,16,14); pc_lay.setSpacing(8)
-        self.step_label = QLabel('当前步骤：空闲')
+        self.step_label = QLabel('Step: idle')
         self.step_label.setStyleSheet('font-size:14px; color:#1A2736;')
         pc_lay.addWidget(self.step_label)
         self.prep_progress = QProgressBar(); self.prep_progress.setFixedHeight(10); self.prep_progress.setTextVisible(False)
@@ -133,13 +129,15 @@ class RedesignedMainWindow(QWidget):
         pc_lay.addWidget(self.log)
         root.addWidget(prep_card)
 
-        # 底部操作区
+        # Footer
         foot = QHBoxLayout(); foot.setSpacing(12)
-        self.hint_label = QLabel('提示：请选择标准视频和个人视频')
+        self.hint_label = QLabel('Hint: select both videos')
         self.hint_label.setStyleSheet('font-size:13px; color:#5B6470;')
         foot.addWidget(self.hint_label)
         foot.addStretch()
-    # 开始按钮移除自动流程（保留占位可后续添加其他操作）
+        self.start_btn = QPushButton('Start Analysis')
+        self.start_btn.setEnabled(False)
+        foot.addWidget(self.start_btn)
         root.addLayout(foot)
 
     def _labeled(self, text, widget):
@@ -155,12 +153,9 @@ class RedesignedMainWindow(QWidget):
 
     # --- 事件绑定 ---
     def _wire_events(self):
-        self.standard_refresh_btn.clicked.connect(self._load_standard_list)
-        self.load_standard_btn.clicked.connect(self._on_load_standard_clicked)
         self.user_select_btn.clicked.connect(self._choose_user_local)
         self.standard_combo.currentIndexChanged.connect(self._on_standard_selection_changed)
-    # 自动流程无需按钮
-        # 初始化加载一次标准视频列表
+        self.start_btn.clicked.connect(self._on_start_clicked)
         QTimer.singleShot(100, self._load_standard_list)
 
     # --- 状态更新 ---
@@ -168,77 +163,78 @@ class RedesignedMainWindow(QWidget):
         self._recalc_can_start()
 
     def _recalc_can_start(self):
-        # 现在点击“开始分析”之前不进入 READY，只要两个视频都解析完成即可允许点击
+    # Enable start when both videos parsed
         can = (self.state.user_state == VideoLoadState.READY and
                self.state.std_state == VideoLoadState.READY)
         self.state.can_start = can
-    # 自动流程不控制按钮
+        self.start_btn.setEnabled(can and self.state.preparation not in (PreparationState.EXTRACTING_KEYFRAMES, PreparationState.READY))
         if not can:
             if self.state.user_state != VideoLoadState.READY:
-                self.hint_label.setText('提示：请提供个人视频')
+                self.hint_label.setText('Hint: user video missing')
             elif self.state.std_state != VideoLoadState.READY:
-                self.hint_label.setText('提示：请提供标准视频')
+                self.hint_label.setText('Hint: standard video missing')
             else:
-                self.hint_label.setText('提示：准备中...')
+                self.hint_label.setText('Hint: parsing...')
         else:
-            self.hint_label.setText('可以开始分析')
+            self.hint_label.setText('Ready to start')
 
     # --- 处理选择 ---
-    def _on_standard_selected(self, path: str, source_label: str = '云端缓存'):
-        self._log(f'选择标准视频: {path}')
+    def _on_standard_selected(self, path: str, source_label: str = 'cache'):
+        # Guard against repeated parsing of same already-ready video
+        if self.state.std_meta and self.state.std_meta.path == path and self.state.std_state == VideoLoadState.READY:
+            return
+        if getattr(self, '_current_std_parsing_path', None) == path and self.state.std_state == VideoLoadState.LOADING:
+            return
+        self._current_std_parsing_path = path
+        self._log(f'Standard selected: {path}')
         self.state.std_state = VideoLoadState.LOADING
-        self.step_label.setText('当前步骤：解析标准视频')
+        self.step_label.setText('Step: parsing standard')
         self.state.preparation = PreparationState.PARSING_STD
         self._parse_video(path, is_standard=True, source=source_label)
         self._recalc_can_start()
 
     def _on_user_selected(self, path: str):
-        self._log(f'选择个人视频: {path}')
+        self._log(f'User selected: {path}')
         self.state.user_state = VideoLoadState.LOADING
-        self.step_label.setText('当前步骤：解析个人视频')
+        self.step_label.setText('Step: parsing user')
         self.state.preparation = PreparationState.PARSING_USER
         self._parse_video(path, is_standard=False, source='本地')
         self._recalc_can_start()
 
     def _choose_user_local(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, '选择个人视频', '', 'Video Files (*.mp4 *.mov *.avi *.mkv)')
+        file_path, _ = QFileDialog.getOpenFileName(self, 'Select User Video', '', 'Video Files (*.mp4 *.mov *.avi *.mkv)')
         if file_path:
             self._on_user_selected(file_path)
 
     def _load_standard_list(self):
-        # 列出 blob 名称
+    # List blob files for standard videos
         self.standard_combo.clear()
         sport_key = 'badminton'; action_key = 'clear'
         folder = f"{sport_key}/{action_key}/"
         try:
             reader = AzureBlobReader()
             blobs = reader.list_files(folder)
-            # 仅保留视频扩展
+            # Filter by video extensions
             videos = [b for b in blobs if b.lower().endswith(('.mp4', '.mov', '.avi', '.mkv'))]
             base_names = [os.path.basename(v) for v in videos]
             self._standard_blob_map = {bn: v for bn, v in zip(base_names, videos)}
             self.standard_combo.addItems(base_names)
-            self._log(f'加载标准视频列表，共 {len(base_names)} 个')
+            self._log(f'Loaded {len(base_names)} standard videos')
         except Exception as e:
-            self._log(f'加载标准列表失败: {e}')
+            self._log(f'Failed to load standard list: {e}')
 
     def _on_standard_selection_changed(self, idx: int):
-        # 选择变化暂不立即下载，等待用户点击“加载”按钮
-        pass
-
-    def _on_load_standard_clicked(self):
         name = self.standard_combo.currentText()
         if not name:
             return
-        blob_path = self._standard_blob_map.get(name)
+        blob_path = getattr(self, '_standard_blob_map', {}).get(name)
         if not blob_path:
             return
         cache_path = self._cache_path(blob_path)
         if os.path.exists(cache_path):
-            self._on_standard_selected(cache_path)
             self.standard_player.set_video(cache_path)
+            self._on_standard_selected(cache_path)
             return
-        # 下载
         reader = AzureBlobReader()
         progress_dialog = DownloadProgressDialog(self)
         thread = QThread()
@@ -252,7 +248,7 @@ class RedesignedMainWindow(QWidget):
             self._on_standard_selected(cp)
         def error(msg):
             progress_dialog.close()
-            self._log(f'标准视频下载失败: {msg}')
+            self._log(f'Standard download failed: {msg}')
             thread.quit(); thread.wait(); worker.deleteLater(); thread.deleteLater()
         worker.finished.connect(finished)
         worker.error.connect(error)
@@ -280,7 +276,7 @@ class RedesignedMainWindow(QWidget):
                 self._parse_timer.stop()
                 meta = self._read_video_meta(path, source)
                 if not meta:
-                    self._log('视频元数据读取失败')
+                    self._log('Failed to read video metadata')
                     if is_standard:
                         self.state.std_state = VideoLoadState.ERROR
                     else:
@@ -297,15 +293,15 @@ class RedesignedMainWindow(QWidget):
                 else:
                     self.state.user_state = VideoLoadState.READY
                     self.state.user_meta = meta
-                self._log(('标准' if is_standard else '个人') + '视频解析完成，等待开始分析')
+                self._log(('Standard' if is_standard else 'User') + ' video loaded')
                 # 不设置 READY，等待用户点击开始分析来触发后续流程
                 if (self.state.user_state == VideoLoadState.READY and
                         self.state.std_state == VideoLoadState.READY):
-                    self.step_label.setText('当前步骤：可开始')
+                    self.step_label.setText('Step: ready')
                 else:
-                    self.step_label.setText('当前步骤：等待另一个视频')
+                    self.step_label.setText('Step: waiting other video')
                 self._recalc_can_start()
-                self._auto_run_pipeline()
+                # No auto run; wait for Start Analysis click
         self._parse_timer = QTimer(self)
         self._parse_timer.timeout.connect(tick)
         self._parse_timer.start(80)
@@ -323,7 +319,7 @@ class RedesignedMainWindow(QWidget):
             cap.release()
             return VideoMeta(path=path, duration=duration, fps=fps, width=width, height=height, source=source)
         except Exception as e:
-            self._log(f'读取视频失败: {e}')
+            self._log(f'Capture open failed: {e}')
             return None
 
     # 去除校验/关键帧模拟：相关函数删除
@@ -333,13 +329,13 @@ class RedesignedMainWindow(QWidget):
 
     # --- 开始分析 ---
     @pyqtSlot()
-    def _auto_run_pipeline(self):
-        if self.state.preparation == PreparationState.READY:
+    def _on_start_clicked(self):
+        if not self.state.can_start:
             return
-        if not (self.state.user_state == VideoLoadState.READY and self.state.std_state == VideoLoadState.READY):
+        if self.state.preparation in (PreparationState.EXTRACTING_KEYFRAMES, PreparationState.READY):
             return
-        self._log('开始自动关键帧提取...')
-        self.step_label.setText('当前步骤：关键帧提取')
+        self._log('Start keyframe extraction...')
+        self.step_label.setText('Step: extracting keyframes')
         self.prep_progress.setRange(0,0)
         timer = QTimer(self)
         def finish():
@@ -351,8 +347,8 @@ class RedesignedMainWindow(QWidget):
                 user_path = self.state.user_meta.path if self.state.user_meta else None
                 std_frames = self._std_extractor.extract('badminton', 'clear', std_path) if std_path else []
                 user_frames = self._user_extractor.extract('badminton', 'clear', user_path) if user_path else []
-                self._log(f'标准关键帧({len(std_frames)}): ' + ', '.join(f"{f.label or f.frame_index}@{f.frame_index}" for f in std_frames))
-                self._log(f'用户关键帧({len(user_frames)}): ' + ', '.join(f"{f.label or f.frame_index}@{f.frame_index}" for f in user_frames))
+                # self._log(f'Standard keyframes ({len(std_frames)}): ' + ', '.join(f"{f.label or f.frame_index}@{f.frame_index}" for f in std_frames))
+                # self._log(f'User keyframes ({len(user_frames)}): ' + ', '.join(f"{f.label or f.frame_index}@{f.frame_index}" for f in user_frames))
                 # 构造 KeyframeSet
                 # 映射策略：预配置帧按顺序映射到 experimental config stages (如果存在)
                 old_cfg = SportConfigs.get_config(sport, action)
@@ -367,20 +363,21 @@ class RedesignedMainWindow(QWidget):
                     return m
                 keyframes = KeyframeSet(user=map_frames(user_frames), standard=map_frames(std_frames))
                 session = EvaluationSession(new_cfg, keyframes, user_video=user_path or '', standard_video=std_path or '')
-                self._log('执行评估...')
+                self._log('Run evaluation...')
                 session.evaluate()
                 state = session.get_state()
                 vm = UIAdapter.to_vm(state, keyframes.user, keyframes.standard)
-                self._log('评估完成，打开结果窗口')
+                self._log('Evaluation complete, opening results window')
                 self._results_win = ResultsWindow(vm, session=session, keyframes=keyframes, adapter=UIAdapter)
                 self._results_win.show()
                 self.state.preparation = PreparationState.READY
                 self.prep_progress.setRange(0,1); self.prep_progress.setValue(1)
-                self.step_label.setText('当前步骤：完成')
+                self.step_label.setText('Step: done')
             except Exception as e:
-                self._log(f'自动流程失败: {e}')
+                self._log(f'Pipeline failed: {e}')
                 self.state.preparation = PreparationState.BLOCKED
                 self.prep_progress.setRange(0,1); self.prep_progress.setValue(0)
+            self._recalc_can_start()
         timer.setSingleShot(True)
         timer.timeout.connect(finish)
         timer.start(800)

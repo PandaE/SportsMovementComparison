@@ -1,0 +1,27 @@
+{
+  "refined_action_summary": "Refine setup with a more open elbow angle and a stronger wrist coil in the backswing, while keeping full extension at impact",
+  "stages": {
+    "setup": {
+      "refined_suggestion": "Lift the racket and keep the shoulder relaxed so the elbow opens into a wider, more natural angle during setup"
+    },
+    "backswing": {
+      "refined_suggestion": "Add a deeper forearm rotation to create a stronger wrist coil before swinging forward, while staying controlled"
+    },
+    "power": {
+      "refined_suggestion": "Keep your current arm extension at impact, as it ensures solid power transfer"
+    }
+  },
+  "training": {
+    "key_issues": [
+      "Upper-Lower Arm Angle",
+      "Wrist Backswing Distance"
+    ],
+    "improvement_drills": [
+      "Repetition drill focusing on finding a comfortable elbow opening in the setup",
+      "Repetition drill emphasizing smooth and elastic wrist coil in the backswing"
+    ],
+    "next_steps": [
+      "Record a new video after practice to review arm openness and wrist preparation"
+    ]
+  }
+}

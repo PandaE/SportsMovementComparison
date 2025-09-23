@@ -60,8 +60,10 @@ def convert(old_action: OldActionConfig) -> NewActionConfig:  # type: ignore
         pass
     scoring = ScoringPolicy(stage_weights={s.key: s.weight for s in new_stages})
     action_name_display = getattr(old_action, 'display_en', None) or old_action.name
+    # Force English sport name; legacy configs still store Chinese internally
+    sport_en = 'Badminton' if getattr(old_action, 'sport', '羽毛球') in ('羽毛球','badminton','Badminton') else getattr(old_action, 'sport', 'Badminton')
     return NewActionConfig(
-        sport='羽毛球',
+        sport=sport_en,
         action=action_name_display,
         stages=new_stages,
         scoring=scoring

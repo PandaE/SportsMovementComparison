@@ -29,11 +29,16 @@ class ResultsWindow(QWidget):
         self._adapter = adapter  # UIAdapter to rebuild VM
         self._pending_indices = {}  # stage_key -> pending user frame index (not yet applied)
         self._user_frame_widgets = []  # store user frame FrameDisplayWidget for global operations
+        self._std_frame_widgets = []   # store standard frame widgets for pose toggle
         self._pose_enabled = False
         self._root_layout = None
         self._stages_container_layout = None
         self._stages_scroll = None
         self._training_widget = None
+        # Header widget refs for dynamic update
+        self._score_label = None
+        self._summary_label = None
+        self._progress_bar_frame = None
         self.setWindowTitle('Action Analysis Results (Simplified Model)')
         self.resize(1180, 860)
         self.build_ui()
@@ -68,16 +73,17 @@ class ResultsWindow(QWidget):
         lay.addWidget(title)
 
         line = QHBoxLayout()
-        score_label = QLabel(str(self.vm.score))
-        score_label.setStyleSheet(f"font-size:56px; font-weight:700; color:{score_color(self.vm.score)};")
-        score_label.setFixedWidth(120)
-        line.addWidget(score_label)
+        self._score_label = QLabel(str(self.vm.score))
+        self._score_label.setStyleSheet(f"font-size:56px; font-weight:700; color:{score_color(self.vm.score)};")
+        self._score_label.setFixedWidth(120)
+        line.addWidget(self._score_label)
 
         summary_box = QVBoxLayout()
-        refined = QLabel(self.vm.summary_refined or (self.vm.summary_raw or ''))
-        refined.setStyleSheet('font-size:16px; color:#1A2736;')
-        summary_box.addWidget(refined)
-        summary_box.addWidget(self.build_progress_bar())
+        self._summary_label = QLabel(self.vm.summary_refined or (self.vm.summary_raw or ''))
+        self._summary_label.setStyleSheet('font-size:16px; color:#1A2736;')
+        summary_box.addWidget(self._summary_label)
+        self._progress_bar_frame = self.build_progress_bar()
+        summary_box.addWidget(self._progress_bar_frame)
         line.addLayout(summary_box, 1)
         line.addStretch()
         lay.addLayout(line)
@@ -95,6 +101,25 @@ class ResultsWindow(QWidget):
             flex = max(1, int(st.score / 10))
             inner.addWidget(seg, flex)
         return bar_wrap
+
+    def _update_progress_bar(self):
+        if not self._progress_bar_frame:
+            return
+        # Clear existing segments
+        layout = self._progress_bar_frame.layout()
+        if layout:
+            while layout.count():
+                item = layout.takeAt(0)
+                w = item.widget()
+                if w:
+                    w.setParent(None)
+            # Re-add segments
+            for st in self.vm.stages:
+                seg = QFrame()
+                seg.setStyleSheet(f"background:{score_color(st.score)}; border-radius:5px;")
+                seg.setFixedHeight(6)
+                flex = max(1, int(st.score / 10))
+                layout.addWidget(seg, flex)
 
     # --- Stages -----------------------------------------------------------
     def build_stages_scroll(self):
@@ -114,6 +139,10 @@ class ResultsWindow(QWidget):
         pose_btn.setCheckable(True)
         pose_btn.toggled.connect(lambda st: self._on_toggle_pose(st, pose_btn))
         row.addWidget(pose_btn)
+        adjust_all_btn = self.small_button('Adjust Frames')
+        adjust_all_btn.clicked.connect(self._apply_all_recompute)
+        adjust_all_btn.setToolTip('Apply all slider changes and recompute every stage')
+        row.addWidget(adjust_all_btn)
         row.addStretch()
         return row
 
@@ -122,6 +151,12 @@ class ResultsWindow(QWidget):
         btn.setText('Hide Pose Skeleton' if state else 'Show Pose Skeleton')
         # Apply to all user frame widgets
         for w in self._user_frame_widgets:
+            try:
+                w.set_pose_enabled(state)
+            except Exception:
+                pass
+        # Apply to all standard frame widgets
+        for w in getattr(self, '_std_frame_widgets', []):
             try:
                 w.set_pose_enabled(state)
             except Exception:
@@ -137,15 +172,12 @@ class ResultsWindow(QWidget):
         title.setStyleSheet(f"font-size:20px; font-weight:600; color:{score_color(stage.score)};")
         header.addWidget(title)
         header.addStretch()
-        adj_btn = self.small_button('Adjust Frame')
-        adj_btn.clicked.connect(lambda _, sk=stage.key: self._confirm_recompute(sk))
-        header.addWidget(adj_btn)
         lay.addLayout(header)
 
         # Frames (actual display widget w/ caching & optional slider)
         frame_row = QHBoxLayout(); frame_row.setSpacing(16)
         frame_row.addWidget(self.frame_widget(stage.user_frame, allow_adjust=True, label_text='User Key Frame', collect_user=True, stage_key=stage.key), 1)
-        frame_row.addWidget(self.frame_widget(stage.standard_frame, allow_adjust=False, label_text='Standard Key Frame'), 1)
+        frame_row.addWidget(self.frame_widget(stage.standard_frame, allow_adjust=False, label_text='Standard Key Frame', collect_standard=True), 1)
         lay.addLayout(frame_row)
 
         # Metrics table
@@ -235,7 +267,7 @@ class ResultsWindow(QWidget):
                           'QPushButton:hover { background:#E1E7ED; }')
         return btn
 
-    def frame_widget(self, frame_ref, allow_adjust: bool, label_text: str, collect_user: bool = False, stage_key: str = ''):
+    def frame_widget(self, frame_ref, allow_adjust: bool, label_text: str, collect_user: bool = False, collect_standard: bool = False, stage_key: str = ''):
         if frame_ref:
             cb = None
             if allow_adjust and stage_key:
@@ -248,6 +280,8 @@ class ResultsWindow(QWidget):
                                    on_frame_changed=cb, enable_pose=self._pose_enabled)
             if collect_user:
                 self._user_frame_widgets.append(w)
+            if collect_standard:
+                self._std_frame_widgets.append(w)
             return w
         # fallback placeholder
         box = QFrame(); box.setMinimumSize(220,160)
@@ -265,6 +299,13 @@ class ResultsWindow(QWidget):
         self._user_frame_widgets = []
         self._rebuild_stages()
         self._rebuild_training()
+        # Update header dynamic elements
+        if self._score_label:
+            self._score_label.setText(str(self.vm.score))
+            self._score_label.setStyleSheet(f"font-size:56px; font-weight:700; color:{score_color(self.vm.score)};")
+        if self._summary_label:
+            self._summary_label.setText(self.vm.summary_refined or (self.vm.summary_raw or ''))
+        self._update_progress_bar()
 
     def _rebuild_stages(self):
         if not self._stages_container_layout:
@@ -300,11 +341,36 @@ class ResultsWindow(QWidget):
                 idx = self._pending_indices.pop(stage_key)
                 # commit to session / keyframe set
                 self._session.update_user_keyframe(stage_key, idx)
-            # Now evaluate only that stage
-            self._session.evaluate(stage_key=stage_key)
+            # 标记所有阶段为 dirty，保证一次点击重新计算整体（包括总分 & 其它阶段可能受全局逻辑影响）
+            for s in self._session.config.stages:  # type: ignore
+                self._session.state.mark_dirty(s.key)
+            # 评估全部 dirty 阶段
+            self._session.evaluate()
             state = self._session.get_state()
             new_vm = self._adapter.to_vm(state, self._keyframes.user, self._keyframes.standard)
+            # 全量刷新（header + stages）
             self._refresh_stage(stage_key, new_vm)
+        except Exception:
+            pass
+
+    def _apply_all_recompute(self):
+        if not (self._session and self._adapter and self._keyframes):
+            return
+        try:
+            # Apply all pending indices
+            changed_any = False
+            for sk, idx in list(self._pending_indices.items()):
+                self._session.update_user_keyframe(sk, idx)
+                changed_any = True
+            self._pending_indices.clear()
+            # Mark all stages dirty regardless to keep consistent overall scoring
+            for s in self._session.config.stages:  # type: ignore
+                self._session.state.mark_dirty(s.key)
+            self._session.evaluate()
+            state = self._session.get_state()
+            new_vm = self._adapter.to_vm(state, self._keyframes.user, self._keyframes.standard)
+            # Use a generic stage_key (won't be used specifically) just to trigger full refresh
+            self._refresh_stage(self.vm.stages[0].key if self.vm.stages else '', new_vm)
         except Exception:
             pass
 

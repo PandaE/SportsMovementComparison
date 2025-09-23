@@ -1,0 +1,26 @@
+{
+  "refined_action_summary": "Optimize arm alignment in setup and enhance wrist coil in backswing while maintaining strong arm extension at impact",
+  "stages": {
+    "setup": {
+      "refined_suggestion": "Keep the racket arm slightly closer to the body to form a more comfortable right angle in the elbow, which will improve swing path and fluidity"
+    },
+    "backswing": {
+      "refined_suggestion": "Emphasize a deeper wrist coil during the backswing to generate more elastic power, while keeping the elbow height steady"
+    },
+    "power": {
+      "refined_suggestion": "Maintain your current arm extension at impact, as it provides solid power and consistency"
+    }
+  },
+  "training": {
+    "key_issues": [
+      "Wrist Backswing Distance"
+    ],
+    "improvement_drills": [
+      "Repetition drill focusing on achieving a natural elbow bend in the setup",
+      "Repetition drill emphasizing controlled wrist coil in the backswing"
+    ],
+    "next_steps": [
+      "Record a new video after practice to check for smoother arm positioning and stronger wrist preparation"
+    ]
+  }
+}

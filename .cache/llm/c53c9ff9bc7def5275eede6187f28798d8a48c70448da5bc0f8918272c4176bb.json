@@ -1,0 +1,27 @@
+{
+  "refined_action_summary": "Focus on correcting your arm alignment at setup and increasing your wrist backswing for more power while maintaining your strong impact extension.",
+  "stages": {
+    "setup": {
+      "refined_suggestion": "Open the angle between your upper and lower arm at setup by positioning your elbow slightly lower and shoulder rotated so the racket arm forms near 100° to prepare for a fluid swing."
+    },
+    "backswing": {
+      "refined_suggestion": "Increase your wrist backswing distance by pulling the racket further behind you with your elbow kept high; this will load more energy into your forehand clear."
+    },
+    "power": {
+      "refined_suggestion": "Maintain your full arm extension at impact to ensure you release maximum power through the shuttle."
+    }
+  },
+  "training": {
+    "key_issues": [
+      "Upper-Lower Arm Angle",
+      "Wrist Backswing Distance"
+    ],
+    "improvement_drills": [
+      "Repetition drill focusing on Upper-Lower Arm Angle",
+      "Repetition drill focusing on Wrist Backswing Distance"
+    ],
+    "next_steps": [
+      "Record a new video after practice for comparison"
+    ]
+  }
+}

@@ -164,17 +164,22 @@ class FrameDisplayWidget(QWidget):
                 pts.append(None)
         # Define simple skeleton pairs (subset)
         pairs: List[Tuple[int,int]] = [
-            (11,13),(13,15),(12,14),(14,16), # arms
-            (11,12), (23,24), # shoulders-hips
-            (23,25),(25,27),(24,26),(26,28), # legs
+            (11,13),(13,15),(12,14),(14,16),  # arms
+            (11,12), (23,24),                # shoulder line & hip line
+            (11,23),(12,24),                 # torso (shoulder->hip) connections
+            (23,25),(25,27),(24,26),(26,28), # thighs
             (27,29),(29,31),(28,30),(30,32)  # lower legs
         ]
+        line_thickness = 5
+        point_radius = 7
         for a,b in pairs:
             if a < len(pts) and b < len(pts) and pts[a] and pts[b]:
-                cv2.line(image_bgr, pts[a], pts[b], (0,255,0), 2)
-        for p in pts:
-            if p:
-                cv2.circle(image_bgr, p, 3, (0,140,255), -1)
+                thick = line_thickness + 1 if (a,b) in {(11,23),(12,24)} else line_thickness
+                cv2.line(image_bgr, pts[a], pts[b], (40,220,90), thick)
+        for idx, p in enumerate(pts):
+            # Skip head / face landmarks (roughly indices 0-10 in MediaPipe Pose)
+            if p and idx >= 11:
+                cv2.circle(image_bgr, p, point_radius, (0,150,255), -1)
         return image_bgr
 
     def _load_and_show(self, idx: int):

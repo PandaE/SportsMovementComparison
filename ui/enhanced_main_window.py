@@ -5,25 +5,29 @@ Enhanced MainWindow with full internationalization support.
 
 import sys
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, 
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox,
     QCheckBox, QGroupBox, QFormLayout
 )
 from PyQt5.QtCore import Qt
 import os
-from ui.enhanced_video_player import EnhancedVideoPlayer
-from ui.enhanced_dialogs import EnhancedDialogs
-# from ui.enhanced_results_window import EnhancedResultsWindow  # deprecated in new flow
-from ui.enhanced_settings_dialog import EnhancedSettingsDialog
-from ui.i18n_mixin import I18nMixin
-from core.comparison_engine import ComparisonEngine
-from core.experimental_comparison_engine import ExperimentalComparisonEngine
-from core.experimental.frame_analyzer.preset_key_frame_extractor import PresetKeyFrameExtractor
-from core.experimental.frame_analyzer.key_frame_extractor import KeyFrameExtractor
-from core.new_evaluation.data_models import ActionConfig as NEActionConfig, StageConfig as NEStageConfig, MetricConfig as NEMetricConfig, KeyframeSet, FrameRef
-from core.new_evaluation.session import EvaluationSession
-from core.new_evaluation.adapter import UIAdapter
-from ui.new_results.results_window import ResultsWindow as NewResultsWindow
-from localization.translation_keys import TK
+try:
+    # Prefer new redesigned window when imported under legacy name elsewhere
+    from ui.new.redesigned_main_window import RedesignedMainWindow as EnhancedMainWindow  # type: ignore
+except Exception:
+    from ui.enhanced_video_player import EnhancedVideoPlayer
+    from ui.enhanced_dialogs import EnhancedDialogs
+    # from ui.enhanced_results_window import EnhancedResultsWindow  # deprecated in new flow
+    from ui.enhanced_settings_dialog import EnhancedSettingsDialog
+    from ui.i18n_mixin import I18nMixin
+    from core.comparison_engine import ComparisonEngine
+    from core.experimental_comparison_engine import ExperimentalComparisonEngine
+    from core.experimental.frame_analyzer.preset_key_frame_extractor import PresetKeyFrameExtractor
+    from core.experimental.frame_analyzer.key_frame_extractor import KeyFrameExtractor
+    from core.new_evaluation.data_models import ActionConfig as NEActionConfig, StageConfig as NEStageConfig, MetricConfig as NEMetricConfig, KeyframeSet, FrameRef
+    from core.new_evaluation.session import EvaluationSession
+    from core.new_evaluation.adapter import UIAdapter
+    from ui.new_results.results_window import ResultsWindow as NewResultsWindow
+    from localization.translation_keys import TK
 
 
 class EnhancedMainWindow(QWidget, I18nMixin):

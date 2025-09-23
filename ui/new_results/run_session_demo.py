@@ -17,8 +17,8 @@ from core.new_evaluation.adapter import UIAdapter
 from ui.new_results.results_window import ResultsWindow
 
 # Reuse the same test assets as mock_data
-USER_VIDEO = r'D:\code\SportsMovementComparison\tests\experimental\test_data\me.mp4'
-STD_VIDEO = r'D:\code\SportsMovementComparison\tests\experimental\test_data\demo.mp4'
+USER_VIDEO = r'D:\code\SportsMovementComparison\tests\experimental\test_data\video.mp4'
+STD_VIDEO = r'D:\code\SportsMovementComparison\standard_videos_cache\badminton\clear\right1.mp4'
 
 # Build real config from experimental sport configs
 old_action_cfg = SportConfigs.get_config('Badminton', 'Forehand Clear')
@@ -26,14 +26,14 @@ config = convert(old_action_cfg)
 
 keyframes = KeyframeSet(
     user={
-        'setup': FrameRef(USER_VIDEO, 46),
-        'backswing': FrameRef(USER_VIDEO, 60),
-        'power': FrameRef(USER_VIDEO, 69)
+        'setup': FrameRef(USER_VIDEO, 84),
+        'backswing': FrameRef(USER_VIDEO, 98),
+        'power': FrameRef(USER_VIDEO, 106)
     },
     standard={
-        'setup': FrameRef(STD_VIDEO, 55),
-        'backswing': FrameRef(STD_VIDEO, 80),
-        'power': FrameRef(STD_VIDEO, 85)
+        'setup': FrameRef(STD_VIDEO, 88),
+        'backswing': FrameRef(STD_VIDEO, 104),
+        'power': FrameRef(STD_VIDEO, 113)
     }
 )
 
